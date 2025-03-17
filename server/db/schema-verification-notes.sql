@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS verification_notes (
+  id SERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id),
+  status VARCHAR(20) NOT NULL,
+  note TEXT NOT NULL,
+  created_by UUID NOT NULL REFERENCES users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
