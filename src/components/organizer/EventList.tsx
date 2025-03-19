@@ -124,6 +124,14 @@ const EventList = () => {
 
                     <h3 className="font-semibold text-lg text-gray-800">{event.title}</h3>
 
+                    {/* Admin Feedback for rejected events */}
+                    {event.verification_status === "rejected" && event.admin_feedback && (
+                      <div className="mt-2 p-3 bg-red-50 border border-red-100 rounded-md">
+                        <p className="text-sm font-medium text-red-800 mb-1">Feedback from Admin:</p>
+                        <p className="text-sm text-red-700">{event.admin_feedback}</p>
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                       <div className="flex items-center">
                         <Calendar className="h-4 w-4 mr-2 text-primary/70" />

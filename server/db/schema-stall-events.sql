@@ -16,5 +16,6 @@ CREATE TABLE IF NOT EXISTS stall_events (
   verification_status verification_status DEFAULT 'pending',
   is_published BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  admin_feedback VARCHAR(255)
 );

@@ -113,7 +113,7 @@ router.get('/', async (req, res, next) => {
     const result = await db.query(query, queryParams);
 
     // Count total for pagination
-    const countQuery = `
+    let countQuery = `
       SELECT COUNT(*) FROM events e
       WHERE e.is_published = true AND e.verification_status = 'verified'
     `;
@@ -231,9 +231,16 @@ router.get('/organiser/myevents/:id', async (req, res, next) => {
       [eventId]
     );
 
+    // Get stalls associated with this event
+    const stallsResult = await db.query(
+      'SELECT * FROM stalls WHERE event_id = $1',
+      [eventId]
+    );
+
     const eventWithImages = {
       ...event,
-      images: imagesResult.rows
+      images: imagesResult.rows,
+      stalls: stallsResult.rows
     };
 
     res.json({ event: eventWithImages });
@@ -360,12 +367,52 @@ router.post('/',
         `);
       }
 
+      // Handle stalls if provided
+      if (req.body.stalls) {
+        try {
+          const stallsData = JSON.parse(req.body.stalls);
+
+          if (Array.isArray(stallsData) && stallsData.length > 0) {
+            for (const stall of stallsData) {
+              await client.query(
+                `INSERT INTO stalls (
+                  event_id, name, description, price, size, 
+                  location_in_venue, is_available, created_at, updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), NOW())`,
+                [
+                  event.id,
+                  stall.name || stall.type,
+                  stall.description || '',
+                  stall.price || 0,
+                  stall.size || '',
+                  stall.locationInVenue || ''
+                ]
+              );
+            }
+          }
+        } catch (error) {
+          console.error('Error processing stalls data:', error);
+          // Continue with event creation even if stalls processing fails
+        }
+      }
+
       await client.query('COMMIT');
+
+      // Get stalls associated with this event if any were created
+      let eventStalls = [];
+      if (req.body.stalls) {
+        const stallsResult = await db.query(
+          'SELECT * FROM stalls WHERE event_id = $1',
+          [event.id]
+        );
+        eventStalls = stallsResult.rows;
+      }
 
       res.status(201).json({
         success: true,
         message: 'Event created successfully',
-        event
+        event,
+        stalls: eventStalls.length > 0 ? eventStalls : undefined
       });
     } catch (error) {
       console.error('Event Creation Error:', error);
@@ -398,8 +445,8 @@ router.get('/edit/:id', authenticate, authorize('event_organizer', 'admin'), asy
     );
 
     if (eventResult.rows.length === 0) {
-      return res.status(404).json({ 
-        message: 'Event not found or you are not authorized to edit it' 
+      return res.status(404).json({
+        message: 'Event not found or you are not authorized to edit it'
       });
     }
 
@@ -416,9 +463,9 @@ router.get('/edit/:id', authenticate, authorize('event_organizer', 'admin'), asy
       images: imagesResult.rows
     };
 
-    res.json({ 
+    res.json({
       success: true,
-      event: eventWithImages 
+      event: eventWithImages
     });
   } catch (error) {
     console.error('Error fetching event for edit:', error);
@@ -426,102 +473,180 @@ router.get('/edit/:id', authenticate, authorize('event_organizer', 'admin'), asy
   }
 });
 
-// Update event (organizer only) - existing route
-router.put('/:id', authenticate, authorize('event_organizer', 'admin'), 
+// Update event (organizer only)
+router.put('/:id',
+  authenticate,
+  authorize('event_organizer', 'admin'),
   upload.fields([
     { name: 'bannerImage', maxCount: 1 },
     { name: 'images', maxCount: 5 }
   ]),
   async (req, res, next) => {
-  const client = await db.getClient();
-
-  try {
-    await client.query('BEGIN');
-
     const eventId = req.params.id;
+    const client = await db.getClient();
 
-    // Check if event exists and belongs to this organizer
-    const eventCheck = await client.query(
-      'SELECT * FROM events WHERE id = $1 AND (organizer_id = $2 OR $3 = true)',
-      [eventId, req.user.id, req.user.role === 'admin']
-    );
+    try {
+      await client.query('BEGIN');
 
-    if (eventCheck.rows.length === 0) {
+      // Check if event exists and belongs to the organizer
+      const eventCheck = await client.query(
+        'SELECT * FROM events WHERE id = $1 AND organizer_id = $2',
+        [eventId, req.user.id]
+      );
+
+      if (eventCheck.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ message: 'Event not found or you do not have permission to update it' });
+      }
+
+      // Extract event data from request body
+      const {
+        title,
+        description,
+        eventType,
+        startDate,
+        endDate,
+        location,
+        address,
+        city,
+        state,
+        country,
+        zipCode,
+        maxCapacity,
+        price,
+        hasStalls
+      } = req.body;
+
+      // Update event in database - Added verification_status and is_published
+      const updateResult = await client.query(
+        `UPDATE events
+         SET title = $1, description = $2, event_type = $3, start_date = $4, end_date = $5,
+             location = $6, address = $7, city = $8, state = $9, country = $10, zip_code = $11,
+             max_capacity = $12, price = $13, updated_at = NOW(), 
+             verification_status = 'pending', is_published = false
+         WHERE id = $14 AND organizer_id = $15
+         RETURNING *`,
+        [
+          title,
+          description,
+          eventType,
+          startDate,
+          endDate,
+          location,
+          address,
+          city,
+          state,
+          country,
+          zipCode,
+          maxCapacity,
+          price,
+          eventId,
+          req.user.id
+        ]
+      );
+
+      // Handle banner image if provided
+      if (req.files && req.files['bannerImage']) {
+        const bannerImage = req.files['bannerImage'][0];
+        const bannerFilename = path.basename(bannerImage.path);
+
+        // Update banner image in database
+        await client.query(
+          'UPDATE events SET banner_image = $1 WHERE id = $2',
+          [bannerFilename, eventId]
+        );
+      }
+
+      // Handle additional images if provided
+      if (req.files && req.files['images'] && req.files['images'].length > 0) {
+        // Delete existing images first
+        await client.query('DELETE FROM event_images WHERE event_id = $1', [eventId]);
+
+        // Insert new images
+        for (const image of req.files['images']) {
+          const imageFilename = path.basename(image.path);
+          await client.query(
+            'INSERT INTO event_images (event_id, image_url) VALUES ($1, $2)',
+            [eventId, imageFilename]
+          );
+        }
+      }
+
+      // Handle stalls if hasStalls is true
+      if (hasStalls === 'true') {
+        // Parse stalls JSON from request body
+        const stalls = JSON.parse(req.body.stalls || '[]');
+
+        // Delete existing stalls first
+        await client.query('DELETE FROM stalls WHERE event_id = $1', [eventId]);
+
+        // Insert new stalls
+        for (const stall of stalls) {
+          await client.query(
+            `INSERT INTO stalls (
+              event_id, 
+              name, 
+              description, 
+              price, 
+              size, 
+              location_in_venue, 
+              is_available
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              eventId,
+              stall.type || stall.name,
+              stall.description,
+              stall.price,
+              stall.size,
+              stall.locationInVenue || null,
+              true // Default to available
+            ]
+          );
+        }
+      } else {
+        // If hasStalls is false, remove all stalls for this event
+        await client.query('DELETE FROM stalls WHERE event_id = $1', [eventId]);
+      }
+
+      await client.query('COMMIT');
+
+      // Get updated event with images
+      const updatedEventResult = await db.query(
+        `SELECT e.*, u.first_name || ' ' || u.last_name as organizer_name
+         FROM events e
+         JOIN users u ON e.organizer_id = u.id
+         WHERE e.id = $1`,
+        [eventId]
+      );
+
+      // Get updated images
+      const updatedImagesResult = await db.query(
+        'SELECT id, image_url FROM event_images WHERE event_id = $1',
+        [eventId]
+      );
+
+      // Get updated stalls
+      const updatedStallsResult = await db.query(
+        'SELECT * FROM stalls WHERE event_id = $1',
+        [eventId]
+      );
+
+      const updatedEvent = {
+        ...updatedEventResult.rows[0],
+        images: updatedImagesResult.rows,
+        stalls: updatedStallsResult.rows
+      };
+
+      res.json({ event: updatedEvent, message: 'Event updated successfully' });
+    } catch (error) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ message: 'Event not found or you are not authorized to edit it' });
+      console.error('Error updating event:', error);
+      next(error);
+    } finally {
+      client.release();
     }
-
-    const {
-      title,
-      description,
-      eventType,
-      startDate,
-      endDate,
-      location,
-      address,
-      city,
-      state,
-      country,
-      zipCode,
-      bannerImage,
-      maxCapacity,
-      price,
-      isPublished,
-      images = []
-    } = req.body;
-
-    // Update event
-    const updateResult = await client.query(
-      `UPDATE events
-       SET title = $1, description = $2, event_type = $3,
-           start_date = $4, end_date = $5, location = $6,
-           address = $7, city = $8, state = $9,
-           country = $10, zip_code = $11, banner_image = $12,
-           max_capacity = $13, price = $14, is_published = $15,
-           updated_at = NOW()
-       WHERE id = $16
-       RETURNING *`,
-      [
-        title, description, eventType,
-        startDate, endDate, location,
-        address, city, state,
-        country, zipCode, bannerImage,
-        maxCapacity, price, isPublished,
-        eventId
-      ]
-    );
-
-    const updatedEvent = updateResult.rows[0];
-
-    // Handle images update if provided
-    if (images.length > 0) {
-      // Delete current images
-      await client.query('DELETE FROM event_images WHERE event_id = $1', [eventId]);
-
-      // Insert new images
-      const imageValues = images.map(image => {
-        return `('${eventId}', '${image}')`;
-      }).join(', ');
-
-      await client.query(`
-        INSERT INTO event_images (event_id, image_url)
-        VALUES ${imageValues}
-      `);
-    }
-
-    await client.query('COMMIT');
-
-    res.json({
-      message: 'Event updated successfully',
-      event: updatedEvent
-    });
-  } catch (error) {
-    await client.query('ROLLBACK');
-    next(error);
-  } finally {
-    client.release();
   }
-});
+);
 
 // Delete event (organizer only)
 router.delete('/:id', authenticate, authorize('event_organizer', 'admin'), async (req, res, next) => {
@@ -592,7 +717,7 @@ router.get('/organizer/myevents', authenticate, authorize('event_organizer'), as
     const result = await db.query(query, queryParams);
 
     // Count total for pagination
-    const countQuery = `
+    let countQuery = `
       SELECT COUNT(*) FROM events
       WHERE organizer_id = $1
     `;
@@ -623,19 +748,19 @@ router.get('/organizer/myevents', authenticate, authorize('event_organizer'), as
 });
 
 // Add this route for event verification (admin only)
-router.post('/verify/:id', 
-  authenticate, 
-  authorize('admin'), 
+router.post('/verify/:id',
+  authenticate,
+  authorize('admin'),
   async (req, res, next) => {
     try {
       const eventId = req.params.id;
       const { status, feedback } = req.body;
-      
+
       // Validate status
       if (!['approved', 'rejected'].includes(status)) {
         return res.status(400).json({ message: 'Invalid status. Must be "approved" or "rejected"' });
       }
-      
+
       // Update event verification status
       const result = await db.query(
         `UPDATE events 
@@ -652,11 +777,11 @@ router.post('/verify/:id',
           eventId
         ]
       );
-      
+
       if (result.rows.length === 0) {
         return res.status(404).json({ message: 'Event not found' });
       }
-      
+
       // Get organizer email for notification
       const organizerQuery = await db.query(
         `SELECT u.email, u.first_name
@@ -665,19 +790,19 @@ router.post('/verify/:id',
          WHERE e.id = $1`,
         [eventId]
       );
-      
+
       if (organizerQuery.rows.length > 0) {
         const { email, first_name } = organizerQuery.rows[0];
         // Here you would send an email notification with the feedback
         // This is where you'd implement email sending logic
         console.log(`Notification would be sent to ${email} with feedback: ${feedback}`);
       }
-      
-      res.json({ 
+
+      res.json({
         message: `Event has been ${status}`,
         event: result.rows[0]
       });
-      
+
     } catch (error) {
       next(error);
     }
@@ -701,6 +826,16 @@ router.get('/admin/pending', authenticate, authorize('admin'), async (req, res, 
 
     const result = await db.query(query, [parseInt(limit), offset]);
 
+    // Get stalls for each event
+    const events = result.rows;
+    for (const event of events) {
+      const stallsResult = await db.query(
+        'SELECT * FROM stalls WHERE event_id = $1',
+        [event.id]
+      );
+      event.stalls = stallsResult.rows;
+    }
+
     // Count total pending
     const countResult = await db.query(
       'SELECT COUNT(*) FROM events WHERE verification_status = $1',
@@ -710,7 +845,7 @@ router.get('/admin/pending', authenticate, authorize('admin'), async (req, res, 
     const totalPending = parseInt(countResult.rows[0].count);
 
     res.json({
-      events: result.rows,
+      events: events,
       pagination: {
         total: totalPending,
         page: parseInt(page),

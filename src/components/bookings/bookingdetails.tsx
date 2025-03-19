@@ -4,8 +4,9 @@ import { BookingService } from "../../lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Clock, Ticket, ArrowLeft, Download, Activity, User, ChevronRight, Share2 } from "lucide-react";
+import { Calendar, MapPin, Clock, Ticket, ArrowLeft, Download, Activity, User, ChevronRight, Share2, CheckCircle } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { toast } from "@/components/ui/use-toast";
 
 interface BookingDetails {
   id: string;
@@ -25,6 +26,8 @@ interface BookingDetails {
   attendee_email?: string;
   payment_status?: string;
   booking_reference?: string;
+  is_used?: boolean;
+  scanned_at?: string;
 }
 
 const BookingDetails = () => {
@@ -32,6 +35,12 @@ const BookingDetails = () => {
   const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [validating, setValidating] = useState(false);
+  const [validationResult, setValidationResult] = useState<{
+    success: boolean;
+    message: string;
+    ticket?: any;
+  } | null>(null);
 
   useEffect(() => {
     const fetchBookingDetails = async () => {
@@ -66,10 +75,58 @@ const BookingDetails = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // New function to validate ticket
+  const validateTicket = async () => {
+    if (!booking || !booking.id) return;
+
+    try {
+      setValidating(true);
+      const response = await BookingService.validateTicket(booking.id);
+
+      setValidationResult(response.data);
+
+      // Update booking with validation result
+      if (response.data.success) {
+        setBooking(prev => prev ? {
+          ...prev,
+          is_used: true,
+          scanned_at: response.data.ticket.scannedAt
+        } : null);
+
+        toast({
+          title: "Ticket Validated",
+          description: "This ticket has been successfully validated and marked as used.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Validation Failed",
+          description: response.data.message,
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      console.error("Error validating ticket:", err);
+      setValidationResult({
+        success: false,
+        message: err.response?.data?.message || "Failed to validate ticket"
+      });
+
+      toast({
+        title: "Validation Error",
+        description: err.response?.data?.message || "Failed to validate ticket",
+        variant: "destructive",
+      });
+    } finally {
+      setValidating(false);
+    }
+  };
+
   // Generate QR code data
   const generateQRData = () => {
     if (!booking) return "";
 
+    // Include the validation endpoint in the QR data
     const qrData = {
       bookingId: booking.id,
       eventTitle: booking.event_title,
@@ -77,7 +134,8 @@ const BookingDetails = () => {
       quantity: booking.quantity || 1,
       attendeeName: booking.attendee_name,
       bookingReference: booking.booking_reference || booking.id,
-      status: booking.status
+      status: booking.status,
+      validationUrl: `${window.location.origin}/api/bookings/validate-ticket/${booking.id}`
     };
 
     return JSON.stringify(qrData);
@@ -354,9 +412,22 @@ const BookingDetails = () => {
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center justify-center">
-                  {booking.status === 'confirmed' ? (
+                  {booking?.status === 'confirmed' ? (
                     <>
-                      <div className="bg-white p-5 rounded-xl shadow-md border border-gray-100 mb-6 transition-all duration-300 hover:shadow-lg">
+                      <div className={`bg-white p-5 rounded-xl shadow-md border ${booking.is_used ? 'border-green-200 bg-green-50' : 'border-gray-100'} mb-6 transition-all duration-300 hover:shadow-lg relative`}>
+                        {booking.is_used && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-xl">
+                            <div className="text-center">
+                              <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-2" />
+                              <p className="font-medium text-green-700">Ticket Used</p>
+                              {booking.scanned_at && (
+                                <p className="text-xs text-green-600 mt-1">
+                                  {new Date(booking.scanned_at).toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
                         <QRCodeSVG
                           value={generateQRData()}
                           size={200}
@@ -383,16 +454,46 @@ const BookingDetails = () => {
                       <p className="text-sm text-gray-600 text-center mb-6 max-w-xs">
                         Present this QR code at the event entrance for quick check-in
                       </p>
-                      <Button
-                        variant="outline"
-                        className="border-gray-200 text-gray-700 hover:bg-gray-50 w-full transition-all duration-300 rounded-lg"
-                        onClick={() => window.print()}
-                      >
-                        <Download className="mr-2 h-4 w-4" />
-                        Print Ticket
-                      </Button>
+
+                      <div className="flex flex-col w-full gap-3">
+                        <Button
+                          variant="outline"
+                          className="border-gray-200 text-gray-700 hover:bg-gray-50 w-full transition-all duration-300 rounded-lg"
+                          onClick={() => window.print()}
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Print Ticket
+                        </Button>
+
+                        {/* Validate Ticket Button - For testing purposes */}
+                        <Button
+                          className={`w-full transition-all duration-300 rounded-lg ${booking.is_used
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200 cursor-not-allowed'
+                              : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800'
+                            }`}
+                          onClick={validateTicket}
+                          disabled={booking.is_used || validating}
+                        >
+                          {validating ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                              Validating...
+                            </>
+                          ) : booking.is_used ? (
+                            <>
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Ticket Used
+                            </>
+                          ) : (
+                            <>
+                              <Ticket className="mr-2 h-4 w-4" />
+                              Validate Ticket
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </>
-                  ) : booking.status === 'pending' ? (
+                  ) : booking?.status === 'pending' ? (
                     <div className="text-center py-8">
                       <div className="bg-yellow-50 p-6 rounded-full mb-6 mx-auto w-20 h-20 flex items-center justify-center shadow-inner">
                         <Clock className="h-10 w-10 text-yellow-500" />

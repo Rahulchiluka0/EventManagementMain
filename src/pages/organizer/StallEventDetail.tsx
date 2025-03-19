@@ -408,7 +408,7 @@ const StallEventDetail = () => {
               </TabsContent>
             </Tabs>
           </CardContent>
-          <CardFooter className="border-t border-gray-50 pt-6 flex justify-end gap-4">
+          {/* <CardFooter className="border-t border-gray-50 pt-6 flex justify-end gap-4">
             <Button
               variant="outline"
               className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
@@ -424,7 +424,7 @@ const StallEventDetail = () => {
               <Plus className="h-4 w-4 mr-2" />
               Add Stall
             </Button>
-          </CardFooter>
+          </CardFooter> */}
         </Card>
 
         {/* Sidebar */}

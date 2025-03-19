@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Edit, Eye, MapPin, Users, MessageSquare, Plus, Filter, Search, Clock, ArrowRight } from "lucide-react";
+import { Calendar, Edit, Eye, MapPin, Users, MessageSquare, Plus, Filter, Search, Clock, ArrowRight, AlertTriangle, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { StallService } from "../../lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Define proper TypeScript interface for the event data
 interface Event {
@@ -28,6 +29,7 @@ interface Event {
   updated_at: string;
   stall_count: string;
   request_count: string;
+  admin_feedback: string | null;
 }
 
 interface ApiResponse {
@@ -195,6 +197,33 @@ const StallEventList = () => {
                       )}
                     </div>
 
+                    {/* Admin Feedback Alert for Rejected Events */}
+                    {event.verification_status === "rejected" && event.admin_feedback && (
+                      <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-800 mt-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle className="text-red-800 font-medium">Rejection Feedback</AlertTitle>
+                        <AlertDescription className="text-red-700">
+                          {event.admin_feedback}
+                          <div className="mt-2 text-sm">
+                            <p className="font-medium">Please make the necessary changes and resubmit your event for verification.</p>
+                          </div>
+                        </AlertDescription>
+                        <div className="mt-3">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="bg-white border-red-300 text-red-700 hover:bg-red-50"
+                            asChild
+                          >
+                            <Link to={`/organizer/stall-events/edit/${event.id}`} className="flex items-center">
+                              <Edit className="h-4 w-4 mr-1" />
+                              Edit & Resubmit
+                            </Link>
+                          </Button>
+                        </div>
+                      </Alert>
+                    )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-600">
                       <div className="flex items-center">
                         <Calendar className="h-4 w-4 mr-2 text-primary/70" />
@@ -225,28 +254,33 @@ const StallEventList = () => {
                   </div>
 
                   <div className="flex flex-wrap gap-2 md:flex-nowrap md:self-center">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild
-                      className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors w-full md:w-auto"
-                    >
-                      {/* <Link to={`/organizer/stall-events/${event.id}`} className="flex items-center justify-center gap-1">
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Details
-                      </Link> */}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild
-                      className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors w-full md:w-auto"
-                    >
-                      <Link to={`/organizer/stall-events/edit/${event.id}`} className="flex items-center justify-center gap-1">
-                        <Edit className="h-4 w-4 mr-1" />
-                        Edit Event
-                      </Link>
-                    </Button>
+                    {event.verification_status === "rejected" ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                        className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 transition-colors w-full md:w-auto"
+                      >
+                        <Link to={`/organizer/stall-events/edit/${event.id}`} className="flex items-center justify-center gap-1">
+                          <RefreshCw className="h-4 w-4 mr-1" />
+                          Update & Resubmit
+                        </Link>
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          asChild
+                          className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors w-full md:w-auto"
+                        >
+                          <Link to={`/organizer/stall-events/edit/${event.id}`} className="flex items-center justify-center gap-1">
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit Event
+                          </Link>
+                        </Button>
+                      </>
+                    )}
                     <Button
                       size="sm"
                       className="bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md transition-all duration-300 w-full md:w-auto"

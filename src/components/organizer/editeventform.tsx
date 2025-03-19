@@ -6,10 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { EventService } from "../../lib/api";
-import { Calendar, Clock, MapPin, Users, DollarSign, Upload, Info } from "lucide-react";
+import { Calendar, Clock, MapPin, Users, DollarSign, Upload, Info, Store, Tag, Layers, PlusCircle, Trash2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useParams, useNavigate } from "react-router-dom";
+import { Switch } from "../ui/switch";
+import { Badge } from "../ui/badge";
 
+// Update the interface to include hasStalls
 interface EditEventFormState {
   title: string;
   description: string;
@@ -24,6 +27,19 @@ interface EditEventFormState {
   zipCode: string;
   maxCapacity: number;
   price: number;
+  hasStalls: boolean; // Add hasStalls property
+}
+
+// Add Stall interface
+interface Stall {
+  id?: string;
+  type: string;
+  description: string;
+  price: number;
+  size: string;
+  locationInVenue?: string;
+  is_available?: boolean;
+  event_id?: string;
 }
 
 const EditEventForm: React.FC = () => {
@@ -36,6 +52,17 @@ const EditEventForm: React.FC = () => {
   const [eventImages, setEventImages] = useState<File[]>([]);
   const [currentBannerUrl, setCurrentBannerUrl] = useState<string>("");
   const [currentEventImageUrls, setCurrentEventImageUrls] = useState<string[]>([]);
+  
+  // Add stalls state
+  const [stalls, setStalls] = useState<Stall[]>([]);
+  const [currentStall, setCurrentStall] = useState<Stall>({
+    type: "",
+    description: "",
+    price: 0,
+    size: "",
+    locationInVenue: ""
+  });
+  
   const [formData, setFormData] = useState<EditEventFormState>({
     title: "",
     description: "",
@@ -50,9 +77,10 @@ const EditEventForm: React.FC = () => {
     zipCode: "",
     maxCapacity: 0,
     price: 0,
+    hasStalls: false, // Initialize hasStalls
   });
 
-  // Fetch event details when component mounts
+  // Update the useEffect to fetch stalls
   useEffect(() => {
     const fetchEventDetails = async () => {
       if (!eventId) return;
@@ -82,6 +110,7 @@ const EditEventForm: React.FC = () => {
           zipCode: event.zip_code || "",
           maxCapacity: event.max_capacity || 0,
           price: event.price || 0,
+          hasStalls: event.stalls && event.stalls.length > 0, // Set hasStalls based on existing stalls
         });
 
         // Set current image URLs
@@ -91,6 +120,20 @@ const EditEventForm: React.FC = () => {
 
         if (event.images && event.images.length > 0) {
           setCurrentEventImageUrls(event.images.map((img: any) => `/uploads/${img.image_url}`));
+        }
+        
+        // Set stalls if they exist
+        if (event.stalls && event.stalls.length > 0) {
+          setStalls(event.stalls.map((stall: any) => ({
+            id: stall.id,
+            type: stall.type || stall.name, // Handle both type and name fields
+            description: stall.description,
+            price: parseFloat(stall.price),
+            size: stall.size,
+            locationInVenue: stall.location_in_venue,
+            is_available: stall.is_available,
+            event_id: stall.event_id
+          })));
         }
 
       } catch (error: any) {
@@ -151,6 +194,54 @@ const EditEventForm: React.FC = () => {
     }
   };
 
+  // Add these function implementations that are missing
+  
+  // Add stall-related handlers
+  const handleStallChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setCurrentStall(prev => ({
+      ...prev,
+      [name]: name === 'price' ? parseFloat(value) || 0 : value,
+    }));
+  };
+  
+  const handleAddStall = () => {
+    // Validate current stall
+    if (!currentStall.type || !currentStall.description || !currentStall.price || !currentStall.size) {
+      toast({
+        variant: "destructive",
+        title: "Incomplete Stall Information",
+        description: "Please fill in all required stall details."
+      });
+      return;
+    }
+  
+    // Add stall to list
+    setStalls(prev => [...prev, currentStall]);
+  
+    // Reset current stall
+    setCurrentStall({
+      type: "",
+      description: "",
+      price: 0,
+      size: "",
+      locationInVenue: ""
+    });
+  };
+  
+  const handleRemoveStall = (index: number) => {
+    const updatedStalls = stalls.filter((_, i) => i !== index);
+    setStalls(updatedStalls);
+  };
+  
+  const toggleHasStalls = (checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      hasStalls: checked
+    }));
+  };
+  
+  // Fix the validateForm function to use formData.hasStalls instead of hasStalls
   const validateForm = (): boolean => {
     const {
       title,
@@ -159,8 +250,9 @@ const EditEventForm: React.FC = () => {
       startDate,
       endDate,
       location,
+      hasStalls
     } = formData;
-
+  
     if (!title || !description || !eventType || !startDate || !endDate || !location) {
       toast({
         variant: "destructive",
@@ -169,7 +261,7 @@ const EditEventForm: React.FC = () => {
       });
       return false;
     }
-
+  
     if (new Date(startDate) > new Date(endDate)) {
       toast({
         variant: "destructive",
@@ -178,7 +270,17 @@ const EditEventForm: React.FC = () => {
       });
       return false;
     }
-
+  
+    // Validate stalls if hasStalls is true
+    if (hasStalls && stalls.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No Stalls",
+        description: "Please add at least one stall to the event.",
+      });
+      return false;
+    }
+  
     return true;
   };
 
@@ -194,7 +296,8 @@ const EditEventForm: React.FC = () => {
     // Append text fields
     Object.entries(formData).forEach(([key, value]) => {
       // Convert numbers to strings
-      const stringValue = typeof value === 'number' ? value.toString() : value;
+      const stringValue = typeof value === 'number' ? value.toString() : 
+        typeof value === 'boolean' ? value.toString() : value;
       formDataToSend.append(key, stringValue);
     });
 
@@ -207,6 +310,11 @@ const EditEventForm: React.FC = () => {
     eventImages.forEach((image) => {
       formDataToSend.append('images', image, image.name);
     });
+    
+    // Append stalls if hasStalls is true
+    if (formData.hasStalls) {
+      formDataToSend.append('stalls', JSON.stringify(stalls));
+    }
 
     try {
       setIsSubmitting(true);
@@ -480,6 +588,165 @@ const EditEventForm: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
+
+          <Separator className="my-6 bg-gray-100" />
+
+          {/* Stalls Toggle Section */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <Store className="h-5 w-5 text-primary mr-2" />
+                <h3 className="text-lg font-medium text-gray-800">Stalls Management</h3>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="hasStalls" className="text-sm text-gray-600">Enable Stalls</Label>
+                <Switch
+                  id="hasStalls"
+                  checked={formData.hasStalls}
+                  onCheckedChange={toggleHasStalls}
+                />
+              </div>
+            </div>
+
+            {formData.hasStalls && (
+              <div className="space-y-6 bg-gray-50 p-6 rounded-lg">
+                {/* Stall Form */}
+                <div className="space-y-4">
+                  <h4 className="font-medium text-gray-700">Add New Stall</h4>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="stallName" className="text-gray-700 text-sm">Stall Type</Label>
+                      <div className="relative">
+                        <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="stallType"
+                          name="type"
+                          value={currentStall.type}
+                          onChange={handleStallChange}
+                          placeholder="Stall type"
+                          className="border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 rounded-lg pl-10"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="stallSize" className="text-gray-700 text-sm">Size</Label>
+                      <div className="relative">
+                        <Layers className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="stallSize"
+                          name="size"
+                          value={currentStall.size}
+                          onChange={handleStallChange}
+                          placeholder="e.g. 10x10 ft"
+                          className="border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 rounded-lg pl-10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="stallPrice" className="text-gray-700 text-sm">Registration fees ($)</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="stallPrice"
+                          name="price"
+                          type="number"
+                          step="0.01"
+                          value={currentStall.price}
+                          onChange={handleStallChange}
+                          placeholder="0.00"
+                          className="border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 rounded-lg pl-10"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="locationInVenue" className="text-gray-700 text-sm">Location in Venue</Label>
+                      <div className="relative">
+                        <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="locationInVenue"
+                          name="locationInVenue"
+                          value={currentStall.locationInVenue}
+                          onChange={handleStallChange}
+                          placeholder="e.g. North Wing, Section A"
+                          className="border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 rounded-lg pl-10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="stallDescription" className="text-gray-700 text-sm">Description</Label>
+                    <Textarea
+                      id="stallDescription"
+                      name="description"
+                      value={currentStall.description}
+                      onChange={handleStallChange}
+                      placeholder="Describe the stall"
+                      className="border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 rounded-lg resize-none min-h-[80px]"
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={handleAddStall}
+                      className="bg-primary hover:bg-primary/90 text-white"
+                    >
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Add Stall
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Stalls List */}
+                {stalls.length > 0 && (
+                  <div className="space-y-4 mt-6">
+                    <h4 className="font-medium text-gray-700">Added Stalls ({stalls.length})</h4>
+                    <div className="space-y-3">
+                      {stalls.map((stall, index) => (
+                        <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h5 className="font-medium text-gray-800">{stall.type}</h5>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="outline" className="text-xs">
+                                  {stall.size}
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  ${stall.price}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-600 mt-1">{stall.description}</p>
+                              {stall.locationInVenue && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  <span className="font-medium">Location:</span> {stall.locationInVenue}
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveStall(index)}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <Separator className="my-6 bg-gray-100" />

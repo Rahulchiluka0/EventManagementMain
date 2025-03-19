@@ -91,7 +91,7 @@ router.get('/events', async (req, res, next) => {
     const result = await db.query(query, queryParams);
 
     // Count total for pagination
-    const countQuery = `
+    let countQuery = `
       SELECT COUNT(*) FROM stall_events
       WHERE is_published = true AND verification_status = 'verified'
     `;
@@ -167,7 +167,7 @@ router.get('/myevents', authenticate, authorize('event_organizer'), async (req, 
     queryParams.push(parseInt(limit), offset);
     const result = await db.query(query, queryParams);
     // Count total for pagination
-    const countQuery = `
+    let countQuery = `
       SELECT COUNT(*) FROM stall_events
       WHERE organizer_id = $1
     `;
@@ -374,73 +374,186 @@ router.post('/events', authenticate, authorize('event_organizer', 'admin'), uplo
   }
 });
 
-// Update stall event (stall organizer only)
-router.put('/events/:id', authenticate, authorize('event_organizer', 'admin'), async (req, res, next) => {
+// Update stall event
+router.put('/events/:id', authenticate, authorize('event_organizer', 'admin'), upload.single('bannerImage'), async (req, res, next) => {
   const client = await db.getClient();
 
   try {
     await client.query('BEGIN');
 
-    const eventId = req.params.id;
+    const { id } = req.params;
+    const {
+      title, description, startDate, endDate, location,
+      address, city, state, country, zipCode, stalls
+    } = req.body;
 
-    // Check if event exists and belongs to this organizer
-    const eventCheck = await client.query(
-      'SELECT * FROM stall_events WHERE id = $1 AND (organizer_id = $2 OR $3 = true)',
-      [eventId, req.user.id, req.user.role === 'admin']
-    );
+    // Log received date values for debugging
+    console.log('Received date values:', { startDate, endDate });
+    console.log('Received ID:', id, 'Type:', typeof id);
 
-    if (eventCheck.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({
-        message: 'Stall event not found or you are not authorized to edit it'
+    // Validate required fields
+    if (!title || title.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: "Title is required"
       });
     }
 
-    const {
-      title,
-      description,
-      startDate,
-      endDate,
-      location,
-      address,
-      city,
-      state,
-      country,
-      zipCode,
-      bannerImage,
-      isPublished
-    } = req.body;
+    // Validate date formats
+    let parsedStartDate, parsedEndDate;
+    try {
+      parsedStartDate = startDate ? new Date(startDate) : null;
+      parsedEndDate = endDate ? new Date(endDate) : null;
 
-    // Update stall event
-    const updateResult = await client.query(
-      `UPDATE stall_events
-       SET title = $1, description = $2, start_date = $3,
-           end_date = $4, location = $5, address = $6,
-           city = $7, state = $8, country = $9,
-           zip_code = $10, banner_image = $11, is_published = $12,
-           updated_at = NOW()
-       WHERE id = $13
-       RETURNING *`,
-      [
-        title, description, startDate,
-        endDate, location, address,
-        city, state, country,
-        zipCode, bannerImage, isPublished,
-        eventId
-      ]
+      // Check if dates are valid
+      if (parsedStartDate === null || isNaN(parsedStartDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid start date format"
+        });
+      }
+
+      if (parsedEndDate === null || isNaN(parsedEndDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid end date format"
+        });
+      }
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid date format: " + error.message
+      });
+    }
+
+    // Check if the event exists and belongs to the user
+    const eventCheck = await client.query(
+      'SELECT * FROM stall_events WHERE id = $1 AND organizer_id = $2',
+      [id, req.user.id]
     );
 
-    const updatedEvent = updateResult.rows[0];
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Stall event not found or you don't have permission to edit it"
+      });
+    }
+
+    // Update the stall event - reset verification_status to 'pending' and clear admin_feedback
+    const updateQuery = `
+      UPDATE stall_events 
+      SET 
+        title = $1, 
+        description = $2, 
+        start_date = $3, 
+        end_date = $4, 
+        location = $5,
+        address = $6,
+        city = $7,
+        state = $8,
+        country = $9,
+        zip_code = $10,
+        verification_status = 'pending',
+        admin_feedback = NULL,
+        is_published = false
+        ${req.file ? ', banner_image = $11' : ''}
+      WHERE id = $${req.file ? '12' : '11'} AND organizer_id = $${req.file ? '13' : '12'}
+      RETURNING *
+    `;
+
+    const updateValues = [
+      title.trim(),
+      description || '',
+      parsedStartDate,
+      parsedEndDate,
+      location || '',
+      address || '',
+      city || '',
+      state || '',
+      country || '',
+      zipCode || ''
+    ];
+
+    if (req.file) {
+      updateValues.push(req.file.filename);
+    }
+
+    updateValues.push(id, req.user.id);
+
+    const updatedEvent = await client.query(updateQuery, updateValues);
+
+    // If stalls are provided, update them
+    if (stalls) {
+      let stallsArray;
+      try {
+        stallsArray = typeof stalls === 'string' ? JSON.parse(stalls) : stalls;
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid stalls data format: " + error.message
+        });
+      }
+
+      // Delete stalls that are not in the new list
+      if (stallsArray.some(s => s.id)) {
+        const stallIds = stallsArray.filter(s => s.id).map(s => s.id);
+        if (stallIds.length > 0) {
+          // Use a different approach for the delete query to handle UUID vs integer comparison
+          const placeholders = stallIds.map((_, idx) => `$${idx + 2}`).join(',');
+          await client.query(
+            `DELETE FROM stalls WHERE stall_event_id = $1 AND id NOT IN (${placeholders})`,
+            [id, ...stallIds]
+          );
+        } else {
+          // If no stalls with IDs, delete all existing stalls
+          await client.query('DELETE FROM stalls WHERE stall_event_id = $1', [id]);
+        }
+      }
+
+      // Update or insert stalls
+      for (const stall of stallsArray) {
+        if (stall.id) {
+          // Update existing stall
+          await client.query(
+            `UPDATE stalls 
+             SET name = $1, description = $2, price = $3, size = $4, location_in_venue = $5
+             WHERE id = $6 AND stall_event_id = $7`,
+            [stall.name, stall.description, stall.price, stall.size, stall.locationInVenue || '', stall.id, id]
+          );
+        } else {
+          // Insert new stall
+          await client.query(
+            `INSERT INTO stalls (stall_event_id, name, description, price, size, location_in_venue, is_available)
+             VALUES ($1, $2, $3, $4, $5, $6, true)`,
+            [id, stall.name, stall.description, stall.price, stall.size, stall.locationInVenue || '']
+          );
+        }
+      }
+    }
+
+    // Create notification for admin about updated event
+    await client.query(
+      `INSERT INTO notifications (user_id, title, message)
+       VALUES ((SELECT id FROM users WHERE role = 'admin' LIMIT 1), $1, $2)`,
+      ['Event Updated', `Event "${title}" has been updated and requires verification.`]
+    );
 
     await client.query('COMMIT');
 
     res.json({
-      message: 'Stall event updated successfully',
-      stallEvent: updatedEvent
+      success: true,
+      message: "Stall event updated successfully and sent for verification",
+      stallEvent: updatedEvent.rows[0]
     });
+
   } catch (error) {
     await client.query('ROLLBACK');
-    next(error);
+    console.error("Error updating stall event:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: error.stack
+    });
   } finally {
     client.release();
   }
@@ -724,10 +837,14 @@ router.get('/admin/pending', authenticate, authorize('admin'), async (req, res, 
     const offset = (page - 1) * limit;
 
     const query = `
-      SELECT se.*, u.first_name || ' ' || u.last_name as organizer_name
+      SELECT se.*, u.first_name || ' ' || u.last_name as organizer_name,
+             COUNT(s.id) as stall_count,
+             COUNT(s.id) FILTER (WHERE s.is_available = true) as available_stall_count
       FROM stall_events se
       JOIN users u ON se.organizer_id = u.id
+      LEFT JOIN stalls s ON se.id = s.stall_event_id
       WHERE se.verification_status = 'pending'
+      GROUP BY se.id, u.first_name, u.last_name
       ORDER BY se.created_at ASC
       LIMIT $1 OFFSET $2
     `;
@@ -761,7 +878,7 @@ router.get('/admin/pending', authenticate, authorize('admin'), async (req, res, 
 router.put('/events/verify/:id', authenticate, authorize('admin'), async (req, res, next) => {
   try {
     const eventId = req.params.id;
-    const { status, feedbackMessage } = req.body;
+    const { status, feedback } = req.body;
 
     if (!['verified', 'rejected'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status. Must be verified or rejected' });
@@ -770,13 +887,13 @@ router.put('/events/verify/:id', authenticate, authorize('admin'), async (req, r
     // Determine is_published value
     const isPublished = status === 'verified' ? true : false;
 
-    // Update event status
+    // Update event status and include admin feedback
     const result = await db.query(
       `UPDATE stall_events
-       SET verification_status = $1, is_published = $2, updated_at = NOW()
-       WHERE id = $3
+       SET verification_status = $1, is_published = $2, admin_feedback = $3, updated_at = NOW()
+       WHERE id = $4
        RETURNING *`,
-      [status, isPublished, eventId]
+      [status, isPublished, feedback || null, eventId]
     );
 
     if (result.rows.length === 0) {
@@ -788,7 +905,7 @@ router.put('/events/verify/:id', authenticate, authorize('admin'), async (req, r
     // Create notification for organizer
     const message = status === 'verified'
       ? `Your stall event "${event.title}" has been approved.`
-      : `Your stall event "${event.title}" was not approved. ${feedbackMessage || ''}`;
+      : `Your stall event "${event.title}" was not approved. ${feedback || ''}`;
 
     await db.query(
       `INSERT INTO notifications (user_id, title, message)

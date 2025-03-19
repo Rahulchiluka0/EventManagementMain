@@ -292,222 +292,181 @@ router.get('/me', authenticate, (req, res) => {
   });
 });
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
+// Setup multer storage for organizer documents
+const organizerStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadDir = path.join(__dirname, '..', 'uploads', 'organizers');
-
-    // Create directory if it doesn't exist
+    const uploadDir = path.join(__dirname, '../uploads/organizers');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
-
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    const uniquePrefix = `${Date.now()}-${uuidv4()}`;
-    cb(null, `${uniquePrefix}-${file.originalname}`);
+    const uniquePrefix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniquePrefix + '-' + file.originalname);
   }
 });
 
-const fileFilter = (req, file, cb) => {
-  // Accept only pdf, jpg, jpeg, png
-  if (
-    file.mimetype === 'application/pdf' ||
-    file.mimetype === 'image/jpeg' ||
-    file.mimetype === 'image/jpg' ||
-    file.mimetype === 'image/png'
-  ) {
-    cb(null, true);
-  } else {
-    cb(new Error('Unsupported file format. Only PDF, JPG, and PNG are allowed.'), false);
-  }
-};
-
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  },
-  fileFilter: fileFilter
-});
-
-// Register a new organizer with document uploads
-router.post('/register-organizer',
-  upload.fields([
-    { name: 'panCard', maxCount: 1 },
-    { name: 'canceledCheck', maxCount: 1 },
-    { name: 'signedAgreement', maxCount: 1 }
-  ]),
-  async (req, res, next) => {
-    try {
-      const {
-        email,
-        password,
-        firstName,
-        lastName,
-        phone,
-        organizationName,
-        website,
-        description,
-        eventTypes,
-        taxId,
-        agreeToTerms,
-        agreeToVerification
-      } = req.body;
-
-      // Check if user already exists
-      const existingUser = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-      if (existingUser.rows.length > 0) {
-        return res.status(400).json({ message: 'User already exists with this email' });
-      }
-
-      // Validate required fields
-      if (!email || !password || !firstName || !lastName || !phone || !organizationName) {
-        return res.status(400).json({ message: 'Missing required fields' });
-      }
-
-      // Validate agreement
-      if (!agreeToTerms || !agreeToVerification) {
-        return res.status(400).json({ message: 'You must agree to the terms and verification process' });
-      }
-
-      // Validate file uploads
-      if (!req.files || !req.files.panCard || !req.files.canceledCheck || !req.files.signedAgreement) {
-        return res.status(400).json({ message: 'All required documents must be uploaded' });
-      }
-
-      // Get file paths
-      const panCardPath = req.files.panCard[0].filename;
-      const canceledCheckPath = req.files.canceledCheck[0].filename;
-      const signedAgreementPath = req.files.signedAgreement[0].filename;
-
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      // Begin transaction
-      await db.query('BEGIN');
-
-      // Insert user with event_organizer role
-      const userResult = await db.query(
-        `INSERT INTO users (email, password, first_name, last_name, role, phone, verification_status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id, email, first_name, last_name, role, verification_status`,
-        [email, hashedPassword, firstName, lastName, 'event_organizer', phone, 'pending']
-      );
-
-      const user = userResult.rows[0];
-
-      // Parse eventTypes if it's a string
-      let parsedEventTypes = eventTypes;
-      if (typeof eventTypes === 'string') {
-        try {
-          parsedEventTypes = JSON.parse(eventTypes);
-        } catch (e) {
-          parsedEventTypes = [eventTypes]; // If it's a single string value
-        }
-      }
-
-      // Insert organizer details
-      await db.query(
-        `INSERT INTO organizer_profiles 
-         (user_id, organization_name, website, description, tax_id, event_types, 
-          pan_card_path, canceled_check_path, agreement_path)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [
-          user.id,
-          organizationName,
-          website || null,
-          description,
-          taxId,
-          parsedEventTypes ? JSON.stringify(parsedEventTypes) : null,
-          panCardPath,
-          canceledCheckPath,
-          signedAgreementPath
-        ]
-      );
-
-      // Generate JWT
-      const token = jwt.sign(
-        { userId: user.id },
-        process.env.JWT_SECRET,
-        { expiresIn: '1h' }
-      );
-
-      // Generate refresh token
-      const refreshToken = jwt.sign(
-        { userId: user.id },
-        process.env.REFRESH_TOKEN_SECRET,
-        { expiresIn: '7d' }
-      );
-
-      // Store refresh token in database
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
-
-      await db.query(
-        `INSERT INTO refresh_tokens (user_id, token, expires_at)
-         VALUES ($1, $2, $3)`,
-        [user.id, refreshToken, expiresAt]
-      );
-
-      // Commit transaction
-      await db.query('COMMIT');
-
-      // Set HTTP-only cookie with token
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 3600000, // 1 hour
-        sameSite: 'strict'
-      });
-
-      // Set refresh token cookie
-      res.cookie('refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        sameSite: 'strict'
-      });
-
-      res.status(201).json({
-        message: 'Organizer registered successfully. Your account is pending verification.',
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          role: user.role,
-          verificationStatus: user.verification_status
-        }
-      });
-    } catch (error) {
-      // Rollback transaction in case of error
-      await db.query('ROLLBACK');
-
-      // Delete uploaded files if they exist
-      if (req.files) {
-        Object.values(req.files).forEach(fileArray => {
-          fileArray.forEach(file => {
-            if (fs.existsSync(file.path)) {
-              fs.unlinkSync(file.path);
-            }
-          });
-        });
-      }
-
-      next(error);
+// Configure multer upload for organizer registration
+const organizerUpload = multer({
+  storage: organizerStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: function (req, file, cb) {
+    // Accept only certain file types
+    if (
+      file.mimetype === 'application/pdf' ||
+      file.mimetype === 'image/jpeg' ||
+      file.mimetype === 'image/jpg' ||
+      file.mimetype === 'image/png'
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF, JPG, and PNG files are allowed'));
     }
   }
-);
-
-// Reapply as organizer (for rejected applications)
-router.put('/reapply-organizer', upload.fields([
+}).fields([
   { name: 'panCard', maxCount: 1 },
   { name: 'canceledCheck', maxCount: 1 },
   { name: 'agreement', maxCount: 1 }
-]), async (req, res, next) => {
+]);
+
+// Register an event organizer
+router.post('/register-organizer', organizerUpload, async (req, res, next) => {
   try {
+    console.log('Received organizer registration request:', req.body);
+    console.log('Files received:', req.files);
+
+    const {
+      firstName, lastName, email, password, phone,
+      organizationName, website, description, eventTypes,
+      taxId, role
+    } = req.body;
+
+    // Check if user already exists
+    const existingUser = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ message: 'User already exists with this email' });
+    }
+
+    // Parse eventTypes if it's a string
+    let parsedEventTypes = eventTypes;
+    if (typeof eventTypes === 'string') {
+      try {
+        parsedEventTypes = JSON.parse(eventTypes);
+      } catch (e) {
+        console.error('Error parsing eventTypes:', e);
+        parsedEventTypes = [];
+      }
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Begin transaction
+    await db.query('BEGIN');
+
+    // Insert user
+    const userResult = await db.query(
+      `INSERT INTO users (email, password, first_name, last_name, role, phone, verification_status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, email, first_name, last_name, role, verification_status`,
+      [email, hashedPassword, firstName, lastName, 'event_organizer', phone, 'pending']
+    );
+
+    const user = userResult.rows[0];
+
+    // Get file paths
+    const panCardPath = req.files.panCard ? req.files.panCard[0].filename : null;
+    const canceledCheckPath = req.files.canceledCheck ? req.files.canceledCheck[0].filename : null;
+    const agreementPath = req.files.agreement ? req.files.agreement[0].filename : null;
+
+    // Insert organizer details
+    await db.query(
+      `INSERT INTO organizer_profiles 
+       (user_id, organization_name, website, description, event_types, tax_id, pan_card_path, canceled_check_path, agreement_path)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9)`,
+      [
+        user.id,
+        organizationName,
+        website || null,
+        description,
+        JSON.stringify(parsedEventTypes), // Convert to valid JSON string
+        taxId || null,
+        panCardPath,
+        canceledCheckPath,
+        agreementPath
+      ]
+    );
+
+
+    // Commit transaction
+    await db.query('COMMIT');
+
+    // Generate JWT
+    const token = jwt.sign(
+      { userId: user.id },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    // Generate refresh token
+    const refreshToken = jwt.sign(
+      { userId: user.id },
+      process.env.REFRESH_TOKEN_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Store refresh token in database
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await db.query(
+      `INSERT INTO refresh_tokens (user_id, token, expires_at)
+       VALUES ($1, $2, $3)`,
+      [user.id, refreshToken, expiresAt]
+    );
+
+    // Set HTTP-only cookie with token
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 3600000, // 1 hour
+      sameSite: 'strict'
+    });
+
+    // Set refresh token cookie
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      sameSite: 'strict'
+    });
+
+    res.status(201).json({
+      message: 'Organizer registration submitted successfully. Your application is pending review.',
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        role: user.role,
+        verificationStatus: user.verification_status
+      }
+    });
+  } catch (error) {
+    // Rollback transaction in case of error
+    await db.query('ROLLBACK');
+    console.error('Error in organizer registration:', error);
+    next(error);
+  }
+});
+
+// Reapply as organizer (for rejected applications)
+router.put('/reapply-organizer', organizerUpload, async (req, res, next) => {
+  try {
+    console.log('Received organizer reapplication request:', req.body);
+    console.log('Files received for reapplication:', req.files);
+    
     const {
       userId, organizationName, website, description,
       taxId, eventTypes
@@ -537,6 +496,17 @@ router.put('/reapply-organizer', upload.fields([
     const canceledCheckPath = req.files.canceledCheck ? req.files.canceledCheck[0].filename : null;
     const agreementPath = req.files.agreement ? req.files.agreement[0].filename : null;
 
+    // Parse eventTypes if it's a string
+    let parsedEventTypes = eventTypes;
+    if (typeof eventTypes === 'string') {
+      try {
+        parsedEventTypes = JSON.parse(eventTypes);
+      } catch (e) {
+        console.error('Error parsing eventTypes in reapplication:', e);
+        parsedEventTypes = [];
+      }
+    }
+
     // Check if organizer profile exists
     const profileResult = await db.query(
       'SELECT * FROM organizer_profiles WHERE user_id = $1',
@@ -548,16 +518,22 @@ router.put('/reapply-organizer', upload.fields([
       await db.query(
         `UPDATE organizer_profiles 
          SET organization_name = $1, website = $2, description = $3,
-             tax_id = $4, event_types = $5, 
+             tax_id = $4, event_types = $5::jsonb, 
              pan_card_path = COALESCE($6, pan_card_path),
              canceled_check_path = COALESCE($7, canceled_check_path),
              agreement_path = COALESCE($8, agreement_path),
              updated_at = NOW()
          WHERE user_id = $9`,
         [
-          organizationName, website, description, taxId,
-          eventTypes ? (typeof eventTypes === 'string' ? eventTypes : JSON.stringify(eventTypes)) : null,
-          panCardPath, canceledCheckPath, agreementPath, userId
+          organizationName, 
+          website || null, 
+          description,
+          taxId || null,
+          JSON.stringify(parsedEventTypes), // Convert to valid JSON string
+          panCardPath, 
+          canceledCheckPath, 
+          agreementPath, 
+          userId
         ]
       );
     } else {
@@ -566,11 +542,17 @@ router.put('/reapply-organizer', upload.fields([
         `INSERT INTO organizer_profiles 
          (user_id, organization_name, website, description, tax_id, 
           event_types, pan_card_path, canceled_check_path, agreement_path)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)`,
         [
-          userId, organizationName, website, description, taxId,
-          eventTypes ? JSON.parse(eventTypes) : null,
-          panCardPath, canceledCheckPath, agreementPath
+          userId, 
+          organizationName, 
+          website || null, 
+          description, 
+          taxId || null,
+          JSON.stringify(parsedEventTypes), // Convert to valid JSON string
+          panCardPath, 
+          canceledCheckPath, 
+          agreementPath
         ]
       );
     }
@@ -582,9 +564,12 @@ router.put('/reapply-organizer', upload.fields([
       message: 'Organizer reapplication submitted successfully. Your account is pending verification.'
     });
   } catch (error) {
+    // Rollback transaction in case of error
     await db.query('ROLLBACK');
+    console.error('Error in organizer reapplication:', error);
     next(error);
   }
 });
+
 
 export default router;

@@ -88,7 +88,7 @@ const EditStallEventForm = () => {
 
                 // Set banner image URL
                 if (event.banner_image) {
-                    setCurrentBannerUrl(`/uploads/${event.banner_image}`);
+                    setCurrentBannerUrl(`http://localhost:3000/uploads/${event.banner_image}`);
                 }
 
                 // Set stalls
@@ -153,6 +153,15 @@ const EditStallEventForm = () => {
         e.preventDefault();
 
         // Validate form
+        if (!title || title.trim() === "") {
+            toast({
+                variant: "destructive",
+                title: "Missing Title",
+                description: "Please provide a title for your event."
+            });
+            return;
+        }
+
         if (stalls.length === 0) {
             toast({
                 variant: "destructive",
@@ -171,31 +180,63 @@ const EditStallEventForm = () => {
             return;
         }
 
-        // Prepare form data
-        const formData = new FormData();
-        formData.append("title", title);
-        formData.append("description", description);
-        formData.append("startDate", new Date(startDate).toISOString());
-        formData.append("endDate", new Date(endDate).toISOString());
-        formData.append("location", location);
-        formData.append("address", address);
-        formData.append("city", city);
-        formData.append("state", state);
-        formData.append("country", country);
-        formData.append("zipCode", zipCode);
-
-        // Append banner image only if a new one is selected
-        if (bannerImage) {
-            formData.append("bannerImage", bannerImage);
-        }
-
-        // Append stalls
-        formData.append("stalls", JSON.stringify(stalls));
-
         try {
             setIsSubmitting(true);
+            
+            // Create a plain object first for debugging
+            const eventData = {
+                title: title.trim(),
+                description: description || "",
+                startDate: new Date(startDate).toISOString(),
+                endDate: new Date(endDate).toISOString(),
+                location: location || "",
+                address: address || "",
+                city: city || "",
+                state: state || "",
+                country: country || "",
+                zipCode: zipCode || "",
+                stalls: stalls
+            };
+            
+            // Log the object to verify data
+            console.log("Event data object:", eventData);
+            
+            // Now prepare form data
+            const formData = new FormData();
+            
+            // Explicitly check and append each field
+            if (!eventData.title) {
+                throw new Error("Title is required but is empty after processing");
+            }
+            
+            formData.append("title", eventData.title);
+            formData.append("description", eventData.description);
+            formData.append("startDate", eventData.startDate);
+            formData.append("endDate", eventData.endDate);
+            formData.append("location", eventData.location);
+            formData.append("address", eventData.address);
+            formData.append("city", eventData.city);
+            formData.append("state", eventData.state);
+            formData.append("country", eventData.country);
+            formData.append("zipCode", eventData.zipCode);
+
+            // Append banner image only if a new one is selected
+            if (bannerImage) {
+                formData.append("bannerImage", bannerImage);
+            }
+
+            // Append stalls
+            formData.append("stalls", JSON.stringify(eventData.stalls));
+
+            // Debug log to see what's being sent
+            console.log("Form data being sent:");
+            for (let [key, value] of formData.entries()) {
+                console.log(`${key}: ${typeof value === 'object' ? 'File or Object' : value}`);
+            }
+
             if (eventId) {
-                await StallService.updateStallEvent(eventId, formData);
+                const response = await StallService.updateStallEvent(eventId, formData);
+                console.log("Update response:", response);
                 toast({
                     title: "Event Updated",
                     description: "Your stall event has been updated successfully.",
@@ -215,7 +256,7 @@ const EditStallEventForm = () => {
             toast({
                 variant: "destructive",
                 title: "Error",
-                description: error.response?.data?.message || "Failed to save stall event. Please try again.",
+                description: error.response?.data?.message || error.message || "Failed to save stall event. Please try again.",
             });
         } finally {
             setIsSubmitting(false);
@@ -443,7 +484,7 @@ const EditStallEventForm = () => {
                                                     const file = e.target.files?.[0];
                                                     if (file) setBannerImage(file);
                                                 }}
-                                                required
+                                                // Remove the required attribute
                                                 className="hidden"
                                             />
                                         </label>
@@ -453,6 +494,18 @@ const EditStallEventForm = () => {
                                         <div className="mt-4 text-sm text-gray-600">
                                             <p className="font-medium">Selected file:</p>
                                             <p>{bannerImage.name} ({(bannerImage.size / (1024 * 1024)).toFixed(2)} MB)</p>
+                                        </div>
+                                    )}
+
+                                    {/* Show current banner if it exists */}
+                                    {currentBannerUrl && !bannerImage && (
+                                        <div className="mt-4">
+                                            <p className="text-sm font-medium text-gray-600 mb-2">Current Banner:</p>
+                                            <img
+                                                src={currentBannerUrl}
+                                                alt="Current banner"
+                                                className="max-h-40 rounded-md border border-gray-200"
+                                            />
                                         </div>
                                     )}
                                 </div>

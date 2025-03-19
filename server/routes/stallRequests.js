@@ -6,7 +6,7 @@ import { authenticate, authorize } from '../middleware/authenticate.js';
 const router = express.Router();
 
 // Get stall request by ID
-router.get('/:id', authenticate, authorize('stall_manager', 'stall_organizer', 'admin'), async (req, res, next) => {
+router.get('/:id', authenticate, authorize('stall_manager', 'event_organizer', 'admin'), async (req, res, next) => {
     try {
         const requestId = req.params.id;
         let query;
@@ -190,7 +190,7 @@ router.post('/', authenticate, authorize('stall_manager'), async (req, res, next
 //         client.release();
 //     }
 // });
-router.put('/:id/status', authenticate, authorize('stall_organizer', 'admin'), async (req, res, next) => {
+router.put('/:id/status', authenticate, authorize('event_organizer', 'admin'), async (req, res, next) => {
     const client = await db.getClient();
 
     try {
@@ -300,7 +300,7 @@ router.get('/manager/requests', authenticate, authorize('stall_manager'), async 
 });
 
 // Get stall requests for the current stall organizer
-router.get('/organizer/requests', authenticate, authorize('stall_organizer'), async (req, res, next) => {
+router.get('/organizer/requests', authenticate, authorize('event_organizer'), async (req, res, next) => {
     try {
         const { status } = req.query;
 

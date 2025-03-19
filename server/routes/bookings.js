@@ -146,7 +146,7 @@ router.get('/my-bookings', authenticate, async (req, res, next) => {
     const result = await db.query(query, queryParams);
 
     // Count total for pagination
-    const countQuery = `
+    let countQuery = `
       SELECT COUNT(*) FROM bookings WHERE user_id = $1
     `;
 
@@ -419,7 +419,7 @@ router.get('/event/:eventId', authenticate, authorize('organizer', 'admin'), asy
     const result = await db.query(query, queryParams);
 
     // Count total for pagination
-    const countQuery = `
+    let countQuery = `
       SELECT COUNT(*) FROM bookings WHERE event_id = $1
     `;
 
@@ -445,6 +445,109 @@ router.get('/event/:eventId', authenticate, authorize('organizer', 'admin'), asy
     });
   } catch (error) {
     next(error);
+  }
+});
+
+// Validate ticket by QR code
+router.post('/validate-ticket/:id', async (req, res, next) => {
+  const client = await db.getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const ticketId = req.params.id;
+
+    // Check if the booking exists and get its current status
+    const bookingResult = await client.query(
+      `SELECT b.*, 
+              e.title as event_title, 
+              u.first_name || ' ' || u.last_name as attendee_name
+       FROM bookings b
+       LEFT JOIN events e ON b.event_id = e.id
+       LEFT JOIN users u ON b.user_id = u.id
+       WHERE b.id = $1`,
+      [ticketId]
+    );
+
+    if (bookingResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        message: 'Ticket not found'
+      });
+    }
+
+    const booking = bookingResult.rows[0];
+
+    // Check if booking is already used
+    if (booking.is_used === true) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        message: 'Ticket has already been used',
+        ticket: {
+          id: booking.id,
+          eventTitle: booking.event_title,
+          attendeeName: booking.attendee_name,
+          isUsed: true,
+          scannedAt: booking.scanned_at
+        }
+      });
+    }
+
+    // Check if booking status is confirmed
+    if (booking.status !== 'confirmed') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        message: `Ticket is not valid. Current status: ${booking.status}`,
+        ticket: {
+          id: booking.id,
+          eventTitle: booking.event_title,
+          attendeeName: booking.attendee_name,
+          status: booking.status
+        }
+      });
+    }
+
+    // Mark the ticket as used
+    const updateResult = await client.query(
+      `UPDATE bookings 
+       SET is_used = true, 
+           scanned_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [ticketId]
+    );
+
+    const updatedBooking = updateResult.rows[0];
+
+    await client.query('COMMIT');
+
+    // Return success response
+    res.json({
+      success: true,
+      message: 'Ticket validated successfully',
+      ticket: {
+        id: updatedBooking.id,
+        eventTitle: booking.event_title,
+        attendeeName: booking.attendee_name,
+        isUsed: true,
+        scannedAt: updatedBooking.scanned_at
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Ticket validation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error validating ticket',
+      error: error.message
+    });
+  } finally {
+    client.release();
   }
 });
 

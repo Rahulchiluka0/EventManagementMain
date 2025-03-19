@@ -101,7 +101,7 @@ export const EventService = {
     api.post('/events', eventData, { headers: { 'Content-Type': 'multipart/form-data' } }),
     
   updateEvent: (id: string, eventData: any) => 
-    api.put(`/events/${id}`, eventData),
+    api.put(`/events/${id}`, eventData, { headers: { 'Content-Type': 'multipart/form-data' } }),
     
   deleteEvent: (id: string) => 
     api.delete(`/events/${id}`),
@@ -109,8 +109,8 @@ export const EventService = {
   getOrganizerEvents: (params?: any) => 
     api.get('/events/organizer/myevents', { params }),
     
-  verifyEvent: (id: string, status: string, feedbackMessage?: string) => 
-    api.put(`/events/verify/${id}`, { status, feedbackMessage }),
+  verifyEvent: (id: string, status: string, feedback?: string) => 
+    api.post(`/events/verify/${id}`, { status, feedback }),
     
   getPendingEvents: (params?: any) => 
     api.get('/events/admin/pending', { params }),
@@ -136,6 +136,11 @@ export const BookingService = {
   },
   getEventBookings: (eventId: string, params?: any) => 
     api.get(`/bookings/event/${eventId}`, { params }),
+
+  validateTicket: async (ticketId) => {
+    return await api.post(`/bookings/validate-ticket/${ticketId}`);
+  },
+
 };
 
 // Payment services
@@ -202,8 +207,8 @@ export const StallService = {
   getPendingEvents: (params?: any) => 
     api.get('/stalls/admin/pending', { params },),
     
-  verifyStallEvent: (id: string, status: string, feedbackMessage?: string) => 
-    api.put(`/stalls/events/verify/${id}`, { status, feedbackMessage }),
+  verifyStallEvent: (id: string, status: string, feedback?: string) => 
+    api.put(`/stalls/events/verify/${id}`, { status, feedback }),
   
   getStallEventById: (id: string) => 
     api.get(`/stalls/events/${id}`),

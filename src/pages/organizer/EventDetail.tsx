@@ -65,6 +65,49 @@ interface EventDetail {
   total_revenue?: string;
 }
 
+// Update the EventDetail interface to include stalls
+interface EventDetail {
+  id: string;
+  title: string;
+  description: string;
+  event_type: string;
+  start_date: string;
+  end_date: string;
+  location: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  zip_code: string;
+  banner_image: string;
+  max_capacity: number;
+  price: string;
+  is_published: boolean;
+  verification_status: string;
+  organizer_id: string;
+  organizer_name: string;
+  created_at: string;
+  updated_at: string;
+  images: Array<{
+    id: string;
+    image_url: string;
+  }>;
+  booking_count?: number;
+  total_revenue?: string;
+  stalls?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    price: string;
+    size: string;
+    location_in_venue: string;
+    is_available: boolean;
+    created_at: string;
+    updated_at: string;
+    event_id: string;
+  }>;
+}
+
 const EventDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -215,8 +258,15 @@ const EventDetail = () => {
                 >
                   Images
                 </TabsTrigger>
+                <TabsTrigger
+                  value="stalls"
+                  className="data-[state=active]:bg-white data-[state=active]:text-gray-800 data-[state=active]:shadow-sm rounded-md transition-all"
+                >
+                  Stalls
+                </TabsTrigger>
               </TabsList>
 
+              {/* Existing TabsContent for details */}
               <TabsContent value="details" className="space-y-8 mt-2">
                 <div className="bg-gray-50/50 rounded-xl p-6">
                   <h3 className="text-lg font-medium text-gray-800 mb-3">Description</h3>
@@ -348,6 +398,103 @@ const EventDetail = () => {
                       <p className="text-gray-400">No additional images available</p>
                     </div>
                   </div>
+                </div>
+              </TabsContent>
+              {/* New TabsContent for stalls */}
+              <TabsContent value="stalls" className="space-y-6 mt-2">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-800">Stalls Information</h3>
+
+                  {eventDetail.stalls && eventDetail.stalls.length > 0 ? (
+                    <div className="space-y-6">
+                      {eventDetail.stalls.map((stall) => (
+                        <Card key={stall.id} className="bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300">
+                          <CardHeader className="pb-3">
+                            <div className="flex justify-between items-center">
+                              <CardTitle className="text-lg font-semibold text-gray-800">{stall.name}</CardTitle>
+                              <Badge className={stall.is_available ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                                {stall.is_available ? "Available" : "Booked"}
+                              </Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                              <div className="flex items-start gap-3">
+                                <div className="bg-blue-50 p-2 rounded-lg">
+                                  <Info className="h-5 w-5 text-blue-600" />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Description</div>
+                                  <div className="text-gray-600 mt-1">
+                                    {stall.description || "No description provided"}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-start gap-3">
+                                <div className="bg-green-50 p-2 rounded-lg">
+                                  <DollarSign className="h-5 w-5 text-green-600" />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Registration Fees</div>
+                                  <div className="text-gray-600 mt-1">
+                                    ${parseFloat(stall.price).toFixed(2)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-start gap-3">
+                                <div className="bg-purple-50 p-2 rounded-lg">
+                                  <MapPin className="h-5 w-5 text-purple-600" />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Location in Venue</div>
+                                  <div className="text-gray-600 mt-1">
+                                    {stall.location_in_venue || "Not specified"}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-start gap-3">
+                                <div className="bg-amber-50 p-2 rounded-lg">
+                                  <Tag className="h-5 w-5 text-amber-600" />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Size</div>
+                                  <div className="text-gray-600 mt-1">
+                                    {stall.size || "Not specified"}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="text-xs text-gray-500 mt-4">
+                              <div>Created: {formatDate(stall.created_at)}</div>
+                              <div>Last Updated: {formatDate(stall.updated_at)}</div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 px-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="bg-gray-100 p-4 rounded-full mb-4">
+                        <Building className="h-8 w-8 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-medium text-gray-700 mb-2">No Stalls Available</h3>
+                      <p className="text-gray-500 text-center max-w-md">
+                        This event doesn't have any stalls configured. You can add stalls when editing the event.
+                      </p>
+                      <Button
+                        variant="outline"
+                        className="mt-6 border-gray-200 text-gray-700 hover:bg-gray-50"
+                        onClick={() => navigate(`/organizer/events/edit/${eventDetail.id}`)}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Event
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>

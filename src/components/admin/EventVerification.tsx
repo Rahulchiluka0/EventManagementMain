@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface Event {
   id: string;
@@ -26,6 +27,20 @@ interface Event {
   ticket_price?: number;
   image_url?: string;
   banner_image?: string;
+  stalls?: Stall[];
+}
+
+interface Stall {
+  id: string;
+  name: string;
+  description: string;
+  price: string;
+  size: string;
+  location_in_venue: string;
+  is_available: boolean;
+  created_at: string;
+  updated_at: string;
+  event_id: string;
 }
 
 const EventVerification = () => {
@@ -160,6 +175,7 @@ const EventVerification = () => {
                                     {event.event_type}
                                   </Badge>
                                 </div>
+                                {/* Inside the event card, add this to the flex-wrap gap-3 div with other event details */}
                                 <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-600">
                                   <div className="flex items-center">
                                     <Calendar className="h-4 w-4 mr-1 text-gray-400" />
@@ -173,6 +189,12 @@ const EventVerification = () => {
                                     <Users className="h-4 w-4 mr-1 text-gray-400" />
                                     {event.max_capacity} attendees
                                   </div>
+                                  {event.stalls && event.stalls.length > 0 && (
+                                    <div className="flex items-center">
+                                      <Store className="h-4 w-4 mr-1 text-blue-500" />
+                                      <span className="text-blue-600">{event.stalls.length} stalls</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                               <div className="flex space-x-2">
@@ -400,36 +422,72 @@ const EventVerification = () => {
                 </div>
               </div>
 
-              <div className="mt-6">
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Verification Status</h3>
-                <Badge
-                  variant="outline"
-                  className="bg-amber-50 text-amber-700 border-amber-200"
-                >
-                  {viewEvent.verification_status.toUpperCase()}
-                </Badge>
-                <p className="text-xs text-gray-500 mt-2">
-                  Submitted on {formatDate(viewEvent.created_at)}
-                </p>
-              </div>
+              {/* Stalls Information */}
+              {viewEvent.stalls && viewEvent.stalls.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Stalls Information</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Size</TableHead>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Registration Fee</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {viewEvent.stalls.map((stall) => (
+                        <TableRow key={stall.id}>
+                          <TableCell className="font-medium">{stall.name}</TableCell>
+                          <TableCell>{stall.description}</TableCell>
+                          <TableCell>{stall.size}</TableCell>
+                          <TableCell>{stall.location_in_venue || "Not specified"}</TableCell>
+                          <TableCell>${parseFloat(stall.price).toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
 
-              <div className="mt-8 flex justify-end space-x-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setDetailsOpen(false)}
-                >
-                  Close
-                </Button>
-                <Button
-                  variant="outline"
-                  className="text-green-600 border-green-200 hover:bg-green-50"
-                  onClick={() => {
-                    setDetailsOpen(false);
-                    setSelectedEvent(viewEvent.id);
-                  }}
-                >
-                  Review Event
-                </Button>
+              {/* Verification Actions */}
+              <div className="mt-6 pt-4 border-t border-gray-100">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Verification Actions</h3>
+                <Textarea
+                  placeholder="Provide feedback to the organizer (optional)"
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  className="min-h-[80px] text-sm mb-4"
+                />
+                <div className="flex justify-end space-x-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setDetailsOpen(false)}
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    className="bg-red-500 hover:bg-red-600 text-white"
+                    onClick={() => {
+                      handleVerification(viewEvent.id, "rejected");
+                      setDetailsOpen(false);
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Reject Event
+                  </Button>
+                  <Button
+                    className="bg-green-500 hover:bg-green-600 text-white"
+                    onClick={() => {
+                      handleVerification(viewEvent.id, "approved");
+                      setDetailsOpen(false);
+                    }}
+                  >
+                    <Check className="h-4 w-4 mr-1" />
+                    Approve Event
+                  </Button>
+                </div>
               </div>
             </div>
           )}

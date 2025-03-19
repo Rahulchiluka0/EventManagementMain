@@ -94,6 +94,7 @@ const OrganizerSignup = () => {
   // Add file handling functions
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fileType: 'panCard' | 'canceledCheck' | 'signedAgreement') => {
     const file = e.target.files?.[0] || null;
+    console.log({ file });
 
     // Validate file
     if (file) {
@@ -139,7 +140,7 @@ const OrganizerSignup = () => {
       // Validate document uploads - check for either new uploads or existing paths
       const hasPanCard = formData.panCard || formData.panCardPath;
       const hasCanceledCheck = formData.canceledCheck || formData.canceledCheckPath;
-      
+
       if (!hasPanCard || !hasCanceledCheck) {
         if (!hasPanCard) {
           setFileErrors(prev => ({
@@ -236,6 +237,7 @@ const OrganizerSignup = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    console.log({ formData });
 
     try {
       // Create FormData for file uploads
@@ -252,17 +254,25 @@ const OrganizerSignup = () => {
       formDataObj.append('organizationName', formData.organizationName);
       formDataObj.append('website', formData.website || '');
       formDataObj.append('description', formData.description);
-      
+
       // Ensure eventTypes is a valid array before stringifying
       const eventTypesArray = Array.isArray(formData.eventTypes) ? formData.eventTypes : [];
       // Send as a properly formatted JSON string
       formDataObj.append('eventTypes', JSON.stringify(eventTypesArray));
-      
+
       formDataObj.append('taxId', formData.taxId || '');
+
+      // Log what files we have before appending
+      console.log('Files to upload:', {
+        panCard: formData.panCard,
+        canceledCheck: formData.canceledCheck,
+        signedAgreement: formData.signedAgreement
+      });
 
       // Add files if they exist (new uploads)
       if (formData.panCard) {
         formDataObj.append('panCard', formData.panCard);
+        console.log('Appending panCard file:', formData.panCard.name);
       } else if (formData.panCardPath) {
         // If using existing file, send the path as a string
         formDataObj.append('panCardPath', String(formData.panCardPath || ''));
@@ -270,29 +280,32 @@ const OrganizerSignup = () => {
 
       if (formData.canceledCheck) {
         formDataObj.append('canceledCheck', formData.canceledCheck);
+        console.log('Appending canceledCheck file:', formData.canceledCheck.name);
       } else if (formData.canceledCheckPath) {
         formDataObj.append('canceledCheckPath', String(formData.canceledCheckPath || ''));
       }
 
       if (formData.signedAgreement) {
+        // Make sure this field name matches what the server expects
         formDataObj.append('agreement', formData.signedAgreement);
+        console.log('Appending agreement file:', formData.signedAgreement.name);
       } else if (formData.agreementPath) {
         formDataObj.append('agreementPath', String(formData.agreementPath || ''));
       }
+
+      // Log all form data entries to debug
+      for (const pair of formDataObj.entries()) {
+        console.log(
+          pair[0],
+          Object.prototype.toString.call(pair[1]) === "[object File]" ? `File: ${pair[1].name}` : pair[1]
+        );
+      }
+
 
       // Add reapplication flag and userId if reapplying
       if (isReapplying && userId) {
         formDataObj.append('isReapplying', 'true');
         formDataObj.append('userId', userId);
-
-        // More detailed logging for debugging
-        console.log("Submitting reapplication with data:", {
-          eventTypes: JSON.stringify(eventTypesArray),
-          userId: userId,
-          panCardPath: formData.panCardPath ? String(formData.panCardPath) : null,
-          canceledCheckPath: formData.canceledCheckPath ? String(formData.canceledCheckPath) : null,
-          agreementPath: formData.agreementPath ? String(formData.agreementPath) : null
-        });
 
         // Call reapply API
         await UserService.reapplyOrganizer(formDataObj);
@@ -306,8 +319,8 @@ const OrganizerSignup = () => {
       } else {
         // Regular registration for new users
         formDataObj.append('role', 'event_organizer');
-        await register(formDataObj);
-        navigate("/organizer-confirmation");
+        await AuthService.organizerRegister(formDataObj);
+        navigate("/verification-pending");
       }
     } catch (error: any) {
       console.error("Organizer signup error:", error);
@@ -750,23 +763,40 @@ const OrganizerSignup = () => {
                           <input
                             type="file"
                             id="signedAgreement"
+                            ref={agreementRef}
                             className="hidden"
                             accept=".pdf,.jpg,.jpeg,.png"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                setFormData(prev => ({ ...prev, signedAgreement: file }));
-                              }
-                            }}
+                            onChange={(e) => handleFileChange(e, 'signedAgreement')}
                           />
                           <div
                             className="flex flex-col items-center justify-center cursor-pointer"
-                            onClick={() => document.getElementById('signedAgreement')?.click()}
+                            onClick={() => triggerFileInput(agreementRef)}
                           >
                             {formData.signedAgreement ? (
                               <div className="flex items-center space-x-2 text-blue-600">
                                 <FileText className="h-6 w-6" />
                                 <span className="font-medium">{formData.signedAgreement.name}</span>
+                              </div>
+                            ) : formData.agreementPath ? (
+                              <div className="flex flex-col items-center">
+                                <div className="flex items-center space-x-2 text-green-600 mb-2">
+                                  <FileCheck className="h-6 w-6" />
+                                  <span className="font-medium">Previously uploaded</span>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex items-center space-x-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    viewDocument(formData.agreementPath);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  <span>View Document</span>
+                                </Button>
+                                <p className="text-xs text-gray-500 mt-2">Click to upload a new file if needed</p>
                               </div>
                             ) : (
                               <>

@@ -250,7 +250,7 @@ const Index = () => {
                     <img
                       src={`http://localhost:3000/uploads/${event.banner_image}`}
                       alt={event.title}
-                      className="w -full h-full object-cover transform group-hover:scale-105 transition-transform duration-500 " loading="lazy" />
+                      className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500 " loading="lazy" />
                     <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-4 py-1 rounded-full text-sm font-semibold text-primary shadow-sm">
                       ${event.price}
                     </div>
