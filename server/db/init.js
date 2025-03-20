@@ -131,18 +131,7 @@ async function initializeDatabase() {
       }
     }
 
-    try {
-      console.log('Creating stall requests schema...');
-      // Execute stalls schema
-      await client.query(stallRequestsSchema);
-    } catch (error) {
-      // If the error is about types already existing, we can continue
-      if (error.code === '42710') {
-        console.log('Some stalls types already exist, continuing...');
-      } else {
-        throw error;
-      }
-    }
+
 
     try {
       console.log('Creating stall Events schema...');
@@ -161,6 +150,18 @@ async function initializeDatabase() {
       console.log('Creating stalls schema...');
       // Execute stalls schema
       await client.query(stallsSchema);
+    } catch (error) {
+      // If the error is about types already existing, we can continue
+      if (error.code === '42710') {
+        console.log('Some stalls types already exist, continuing...');
+      } else {
+        throw error;
+      }
+    }
+    try {
+      console.log('Creating stall requests schema...');
+      // Execute stalls schema
+      await client.query(stallRequestsSchema);
     } catch (error) {
       // If the error is about types already existing, we can continue
       if (error.code === '42710') {

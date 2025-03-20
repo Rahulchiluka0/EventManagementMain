@@ -65,9 +65,9 @@ const Booking = () => {
         quantity: quantity,
         notes: "Looking forward to this event!"
       };
-      
+
       const response = await BookingService.createBooking(bookingData);
-      
+
       // Redirect to payment page
       if (response.data && response.data.paymentUrl) {
         navigate(response.data.paymentUrl);
@@ -228,7 +228,7 @@ const Booking = () => {
                       </div>
                       <p className="text-sm text-gray-500 mt-2">
                         {availableTickets > 0
-                          ? `${availableTickets} tickets available`
+                          ? `${availableTickets} tickets available (maximum 10 tickets per user)`
                           : "No tickets available"}
                       </p>
                     </div>

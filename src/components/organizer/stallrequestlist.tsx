@@ -10,10 +10,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 
 // Define TypeScript interfaces for type safety
+// Update the StallRequest interface to include event_id and event_type
 interface StallRequest {
     id: string;
     requester_id: string;
-    stall_event_id: string;
+    stall_event_id: string | null;
+    event_id: string | null;
     stall_id: string;
     organizer_id: string;
     request_message: string | null;
@@ -24,13 +26,14 @@ interface StallRequest {
     stall_name: string;
     event_title: string;
     requester_name: string;
+    event_type?: string; // 'stall_event' or 'regular_event'
 }
 
 const StallRequestList = () => {
     const { toast } = useToast();
     const [stallRequests, setStallRequests] = useState<StallRequest[]>([]);
     const [loading, setLoading] = useState(true);
-    const [feedbackMessage, setFeedbackMessage] = useState("");
+    const [feedback, setFeedback] = useState("");
     const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
     const [expandedRequests, setExpandedRequests] = useState<Set<string>>(new Set());
 
@@ -55,14 +58,14 @@ const StallRequestList = () => {
 
     const handleVerification = async (requestId: string, status: string) => {
         try {
-            await StallService.verifyStallRequest(requestId, status, feedbackMessage);
+            await StallService.verifyStallRequest(requestId, status, feedback);
             toast({
                 title: `Request ${status.charAt(0).toUpperCase() + status.slice(1)}`,
                 description: `Request has been ${status} successfully`,
             });
             setStallRequests(prev => prev.filter(request => request.id !== requestId));
             setSelectedRequestId(null);
-            setFeedbackMessage("");
+            setFeedback("");
         } catch (error) {
             toast({
                 title: "Operation Failed",
@@ -217,7 +220,7 @@ const StallRequestList = () => {
                                                             className="border-green-200 text-green-600 hover:bg-green-50 hover:text-green-700 transition-colors"
                                                             onClick={() => {
                                                                 setSelectedRequestId(request.id);
-                                                                setFeedbackMessage("");
+                                                                setFeedback("");
                                                             }}
                                                         >
                                                             <Check className="h-4 w-4 mr-1" />
@@ -229,7 +232,7 @@ const StallRequestList = () => {
                                                             className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
                                                             onClick={() => {
                                                                 setSelectedRequestId(request.id);
-                                                                setFeedbackMessage("");
+                                                                setFeedback("");
                                                             }}
                                                         >
                                                             <X className="h-4 w-4 mr-1" />
@@ -240,11 +243,17 @@ const StallRequestList = () => {
                                             </div>
 
                                             {/* Expanded Details */}
+                                            {/* // In the expanded details section, add event type information */}
                                             {expandedRequests.has(request.id) && (
                                                 <div className="mt-2 pt-4 border-t border-gray-100">
                                                     <div className="mb-4">
                                                         <h4 className="text-sm font-medium text-gray-700 mb-2">Event Details</h4>
                                                         <p className="text-sm text-gray-600">{request.event_title}</p>
+                                                        {request.event_type && (
+                                                            <Badge className="mt-2 bg-blue-100 text-blue-800 hover:bg-blue-200">
+                                                                {request.event_type === 'stall_event' ? 'Stall Event' : 'Regular Event'}
+                                                            </Badge>
+                                                        )}
                                                     </div>
 
                                                     <div className="mb-4">
@@ -262,8 +271,8 @@ const StallRequestList = () => {
                                                     <h4 className="text-sm font-medium text-gray-700">Provide Feedback</h4>
                                                     <Textarea
                                                         placeholder="Enter your feedback message here..."
-                                                        value={feedbackMessage}
-                                                        onChange={(e) => setFeedbackMessage(e.target.value)}
+                                                        value={feedback}
+                                                        onChange={(e) => setFeedback(e.target.value)}
                                                         className="min-h-[100px] border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 rounded-lg"
                                                     />
                                                     <div className="flex flex-wrap gap-2">
@@ -289,7 +298,7 @@ const StallRequestList = () => {
                                                             className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                                                             onClick={() => {
                                                                 setSelectedRequestId(null);
-                                                                setFeedbackMessage("");
+                                                                setFeedback("");
                                                             }}
                                                         >
                                                             Cancel

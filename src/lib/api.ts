@@ -62,6 +62,13 @@ api.interceptors.response.use(
   }
 );
 
+interface StallRequestPayload {
+  stallEventId?: string;
+  stallId: string;
+  eventId?: string;
+  requestMessage: string;
+}
+
 // Auth services
 export const AuthService = {
   login: (email: string, password: string) => 
@@ -237,11 +244,12 @@ export const StallService = {
   getMyStallsRequests: () => 
     api.get('/stall-requests/manager/requests'),
     
-  verifyStallRequest: (id: string, status: string, feedbackMessage?: string) => 
-    api.put(`/stall-requests/${id}/status`, { status, feedbackMessage }),
+  verifyStallRequest: (id: string, status: string, feedback?: string) => 
+    api.put(`/stall-requests/${id}/status`, { status, feedback }),
 
-  requestStall: (stallId: string, stallEventId: string) => 
-    api.post(`/stall-requests`, { stallId, stallEventId, message: "I want to apply for this new stall" }),
+  requestStall: (payload: StallRequestPayload) => {
+    return api.post('/stall-requests', payload);
+  },
   assignManager: (stallId: string, managerId: string) => 
     api.put(`/stalls/stalls/${stallId}/assign`, { managerId }),
   

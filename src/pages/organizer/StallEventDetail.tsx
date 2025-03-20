@@ -291,7 +291,7 @@ const StallEventDetail = () => {
 
                 <Separator className="my-6 bg-gray-100" />
 
-                <div>
+                {/* <div>
                   <h3 className="text-lg font-medium text-gray-800 mb-4">Organizer Information</h3>
                   <div className="bg-gray-50/50 rounded-xl p-6">
                     <div className="flex items-start gap-3">
@@ -314,11 +314,11 @@ const StallEventDetail = () => {
                       </div>
                     </div>
                   </div>
-                </div>
+                </div> */}
               </TabsContent>
 
               <TabsContent value="stalls" className="space-y-6 mt-2">
-                <div className="flex justify-between items-center">
+                {/* <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium text-gray-800">Available Stalls</h3>
                   <Button
                     size="sm"
@@ -328,7 +328,7 @@ const StallEventDetail = () => {
                     <Plus className="h-4 w-4 mr-2" />
                     Add Stall
                   </Button>
-                </div>
+                </div> */}
 
                 {eventDetail.stalls.length > 0 ? (
                   <div className="grid grid-cols-1 gap-4">
@@ -361,7 +361,7 @@ const StallEventDetail = () => {
                                   <div className="font-medium text-gray-800">{stall.location_in_venue}</div>
                                 </div>
                               </div>
-                              <div className="flex justify-end gap-3">
+                              {/* <div className="flex justify-end gap-3">
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -382,7 +382,7 @@ const StallEventDetail = () => {
                                   )}
                                   {stall.is_available ? "Mark as Unavailable" : "Mark as Available"}
                                 </Button>
-                              </div>
+                              </div> */}
                             </div>
                           </div>
                         </CardContent>
@@ -515,14 +515,14 @@ const StallEventDetail = () => {
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Event
                 </Button>
-                <Button
+                {/* <Button
                   variant="outline"
                   className="w-full justify-start border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                   onClick={() => navigate(`/organizer/stall-events/${eventDetail.id}/add-stall`)}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Stall
-                </Button>
+                </Button> */}
                 <Button
                   variant="outline"
                   className="w-full justify-start border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"

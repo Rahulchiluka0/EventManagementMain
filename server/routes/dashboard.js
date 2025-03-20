@@ -167,7 +167,7 @@ router.get('/organizer', authenticate, authorize('event_organizer'), async (req,
 
     // Recent ticket bookings
     const recentTicketBookings = await db.query(`
-      SELECT b.id, b.booking_date, b.status, b.total_price,
+      SELECT b.id, b.booking_date, b.status, b.total_price, b.quantity,
              u.first_name || ' ' || u.last_name as user_name,
              e.title as event_title,
              'ticket' as booking_type

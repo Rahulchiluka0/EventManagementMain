@@ -675,7 +675,7 @@ const EventForm: React.FC = () => {
                                 <Badge variant="outline" className="text-xs">
                                   {stall.size}
                                 </Badge>
-                                <Badge variant="secondary" className="text-xs">
+                                <Badge variant="outline" className="text-xs">
                                   ${stall.price}
                                 </Badge>
                               </div>

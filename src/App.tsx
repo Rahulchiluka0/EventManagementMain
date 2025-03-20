@@ -56,6 +56,7 @@ import LandingPage from "./components/landing/LandingPage";
 import OrganizerSignup from "./pages/OrganizerSignup";
 import VerificationPending from "./pages/VerificationPending";
 import VerificationRejected from "./pages/VerificationRejected";
+import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
 
@@ -69,10 +70,13 @@ const App = () => (
           <Routes>
             <Route path="/landingPage" element={<LandingPage />} />
             <Route path="/organizer-signup" element={<OrganizerSignup />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
 
             <Route element={<Layout />}>
               <Route path="/" element={<Index />} />
               <Route path="/dashboard" element={<UserDashboard />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/events/:id" element={<EventDetails />} />
               <Route path="/stalls/:id" element={<StallEventDetails />} />
               <Route path="/booking/:id" element={<Booking />} />
@@ -80,8 +84,6 @@ const App = () => (
               <Route path="/payment/:bookingId" element={<Payment />} />
               <Route path="/payment/failed/:bookingId" element={<PaymentFailed />} />
               <Route path="/confirmation/:bookingId" element={<Confirmation />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
               <Route path="/redirect" element={<Redirect />} />
               <Route path="*" element={<NotFound />} />
             </Route>
@@ -93,7 +95,6 @@ const App = () => (
               <Route path="sales" element={<SalesTracking />} />
               <Route path="settings" element={<div>Settings Content</div>} />
               <Route path="notifications" element={<div>Notifications Content</div>} />
-              <Route path="profile" element={<div>Profile Content</div>} />
             </Route>
             <Route path="/organizer" element={<OrganizerLayout />}>
               <Route index element={<OrganizerDashboard />} />

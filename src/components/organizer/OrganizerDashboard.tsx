@@ -26,7 +26,7 @@ const OrganizerDashboard = () => {
           id: booking.id,
           eventName: booking.event_title,
           customerName: booking.user_name,
-          tickets: 1,
+          tickets: booking.quantity,
           date: new Date(booking.booking_date).toLocaleDateString(),
           amount: `$${booking.total_price}`,
           status: Math.random() > 0.3 ? "confirmed" : "pending", // Mock status for UI enhancement

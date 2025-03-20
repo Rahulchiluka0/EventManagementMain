@@ -52,7 +52,7 @@ const EditEventForm: React.FC = () => {
   const [eventImages, setEventImages] = useState<File[]>([]);
   const [currentBannerUrl, setCurrentBannerUrl] = useState<string>("");
   const [currentEventImageUrls, setCurrentEventImageUrls] = useState<string[]>([]);
-  
+
   // Add stalls state
   const [stalls, setStalls] = useState<Stall[]>([]);
   const [currentStall, setCurrentStall] = useState<Stall>({
@@ -62,7 +62,7 @@ const EditEventForm: React.FC = () => {
     size: "",
     locationInVenue: ""
   });
-  
+
   const [formData, setFormData] = useState<EditEventFormState>({
     title: "",
     description: "",
@@ -121,7 +121,7 @@ const EditEventForm: React.FC = () => {
         if (event.images && event.images.length > 0) {
           setCurrentEventImageUrls(event.images.map((img: any) => `/uploads/${img.image_url}`));
         }
-        
+
         // Set stalls if they exist
         if (event.stalls && event.stalls.length > 0) {
           setStalls(event.stalls.map((stall: any) => ({
@@ -195,7 +195,7 @@ const EditEventForm: React.FC = () => {
   };
 
   // Add these function implementations that are missing
-  
+
   // Add stall-related handlers
   const handleStallChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -204,7 +204,7 @@ const EditEventForm: React.FC = () => {
       [name]: name === 'price' ? parseFloat(value) || 0 : value,
     }));
   };
-  
+
   const handleAddStall = () => {
     // Validate current stall
     if (!currentStall.type || !currentStall.description || !currentStall.price || !currentStall.size) {
@@ -215,10 +215,10 @@ const EditEventForm: React.FC = () => {
       });
       return;
     }
-  
+
     // Add stall to list
     setStalls(prev => [...prev, currentStall]);
-  
+
     // Reset current stall
     setCurrentStall({
       type: "",
@@ -228,19 +228,19 @@ const EditEventForm: React.FC = () => {
       locationInVenue: ""
     });
   };
-  
+
   const handleRemoveStall = (index: number) => {
     const updatedStalls = stalls.filter((_, i) => i !== index);
     setStalls(updatedStalls);
   };
-  
+
   const toggleHasStalls = (checked: boolean) => {
     setFormData(prev => ({
       ...prev,
       hasStalls: checked
     }));
   };
-  
+
   // Fix the validateForm function to use formData.hasStalls instead of hasStalls
   const validateForm = (): boolean => {
     const {
@@ -252,7 +252,7 @@ const EditEventForm: React.FC = () => {
       location,
       hasStalls
     } = formData;
-  
+
     if (!title || !description || !eventType || !startDate || !endDate || !location) {
       toast({
         variant: "destructive",
@@ -261,7 +261,7 @@ const EditEventForm: React.FC = () => {
       });
       return false;
     }
-  
+
     if (new Date(startDate) > new Date(endDate)) {
       toast({
         variant: "destructive",
@@ -270,7 +270,7 @@ const EditEventForm: React.FC = () => {
       });
       return false;
     }
-  
+
     // Validate stalls if hasStalls is true
     if (hasStalls && stalls.length === 0) {
       toast({
@@ -280,7 +280,7 @@ const EditEventForm: React.FC = () => {
       });
       return false;
     }
-  
+
     return true;
   };
 
@@ -296,7 +296,7 @@ const EditEventForm: React.FC = () => {
     // Append text fields
     Object.entries(formData).forEach(([key, value]) => {
       // Convert numbers to strings
-      const stringValue = typeof value === 'number' ? value.toString() : 
+      const stringValue = typeof value === 'number' ? value.toString() :
         typeof value === 'boolean' ? value.toString() : value;
       formDataToSend.append(key, stringValue);
     });
@@ -310,7 +310,7 @@ const EditEventForm: React.FC = () => {
     eventImages.forEach((image) => {
       formDataToSend.append('images', image, image.name);
     });
-    
+
     // Append stalls if hasStalls is true
     if (formData.hasStalls) {
       formDataToSend.append('stalls', JSON.stringify(stalls));
@@ -719,7 +719,7 @@ const EditEventForm: React.FC = () => {
                                 <Badge variant="outline" className="text-xs">
                                   {stall.size}
                                 </Badge>
-                                <Badge variant="secondary" className="text-xs">
+                                <Badge variant="outline" className="text-xs">
                                   ${stall.price}
                                 </Badge>
                               </div>

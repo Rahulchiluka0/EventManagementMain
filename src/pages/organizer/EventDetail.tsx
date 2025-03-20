@@ -499,7 +499,7 @@ const EventDetail = () => {
               </TabsContent>
             </Tabs>
           </CardContent>
-          <CardFooter className="border-t border-gray-50 pt-6 flex justify-end gap-4">
+          {/* <CardFooter className="border-t border-gray-50 pt-6 flex justify-end gap-4">
             <Button
               variant="outline"
               className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
@@ -515,7 +515,7 @@ const EventDetail = () => {
               <BookOpen className="h-4 w-4 mr-2" />
               View Bookings
             </Button>
-          </CardFooter>
+          </CardFooter> */}
         </Card>
 
         {/* Sidebar */}
@@ -610,14 +610,14 @@ const EventDetail = () => {
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Event
                 </Button>
-                <Button
+                {/* <Button
                   variant="outline"
                   className="w-full justify-start border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                   onClick={() => navigate(`/organizer/events/${eventDetail.id}/bookings`)}
                 >
                   <BookOpen className="h-4 w-4 mr-2" />
                   View Bookings
-                </Button>
+                </Button> */}
                 <Button
                   variant="outline"
                   className="w-full justify-start border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"

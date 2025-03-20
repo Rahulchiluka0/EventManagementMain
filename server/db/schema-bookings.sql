@@ -15,4 +15,7 @@ CREATE TABLE IF NOT EXISTS bookings (
     (event_id IS NOT NULL AND stall_id IS NULL) OR
     (event_id IS NULL AND stall_id IS NOT NULL)
   )
+  stall_price INTEGER,
+  is_valid BOOLEAN DEFAULT TRUE,
+  scanned_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
 );

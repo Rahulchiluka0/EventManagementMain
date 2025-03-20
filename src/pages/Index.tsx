@@ -3,9 +3,18 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Calendar, MapPin, Clock, ChevronRight, Tag, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { EventService, StallService } from "../lib/api";
+import { AuthService, EventService, StallService } from "../lib/api";
 import { motion } from "framer-motion";
-import debounce from "lodash.debounce"; // Import debounce from lodash
+import debounce from "lodash.debounce";
+
+// User interface
+interface User {
+  id: string;
+  role: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
 
 // Define the type for the event
 interface Event {
@@ -18,6 +27,7 @@ interface Event {
   location: string;
   price: string;
   banner_image: string;
+  has_stalls?: boolean;
 }
 
 // Define the type for the stall event
@@ -41,6 +51,8 @@ const Index = () => {
   const searchQuery = searchParams.get("search") || "";
   const eventsRef = useRef<HTMLElement>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [userLoading, setUserLoading] = useState(true);
 
   const handleExplore = () => {
     eventsRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -55,9 +67,14 @@ const Index = () => {
         event.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         event.location.toLowerCase().includes(searchQuery.toLowerCase());
 
-      return matchesCategory && matchesSearch;
+      // For stall_manager, only show events with stalls
+      const matchesRole = currentUser?.role === "stall_manager"
+        ? event.has_stalls
+        : true; // For other roles (including user), show all events
+
+      return matchesCategory && matchesSearch && matchesRole;
     });
-  }, [events, selectedCategory, searchQuery]);
+  }, [events, selectedCategory, searchQuery, currentUser]);
 
   const filteredStallEvents = useMemo(() => {
     return stallEvents.filter(stallEvent => {
@@ -69,6 +86,25 @@ const Index = () => {
       return matchesSearch;
     });
   }, [stallEvents, searchQuery]);
+
+  // Fetch current user
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      setUserLoading(true);
+      try {
+        const response = await AuthService.getCurrentUser();
+        setCurrentUser(response.data.user);
+      } catch (error) {
+        console.error("Error fetching current user:", error);
+        // If we can't fetch the user, we'll assume they're not logged in
+        setCurrentUser(null);
+      } finally {
+        setUserLoading(false);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
 
   useEffect(() => {
     setIsLoading(true);
@@ -302,108 +338,110 @@ const Index = () => {
       </section>
 
       {/* Stall Events Grid */}
-      <section className="container mx-auto px-4 py-12 mb-16">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex justify-between items-center mb-8"
-        >
-          <div>
-            <h2 className="text-3xl font-bold text-gray-800">
-              {searchQuery ? `Stall Results for "${searchQuery}"` : "Upcoming Stall Events"}
-            </h2>
-            <p className="text-gray-500 mt-2">Find the perfect stall for your business</p>
-          </div>
-          {filteredStallEvents.length === 0 && searchQuery && (
-            <Button
-              variant="outline"
-              onClick={() => window.location.href = "/"}
-              className="rounded-full border-gray-300 hover:border-primary hover:text-primary transition-all duration-300"
-            >
-              <Search className="mr-2 h-4 w-4" />
-              Clear Search
-            </Button>
-          )}
-        </motion.div>
-
-        {isLoading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          </div>
-        ) : filteredStallEvents.length === 0 ? (
+      {currentUser && currentUser.role === "stall_manager" && (
+        <section className="container mx-auto px-4 py-12 mb-16">
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-16 bg-gray-50/50 rounded-2xl backdrop-blur-sm border border-gray-100"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex justify-between items-center mb-8"
           >
-            <Search className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-xl text-gray-600 mb-2">No stall events found</p>
-            <p className="text-gray-500">Try adjusting your search criteria</p>
-          </motion.div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredStallEvents.map(stallEvent => (
-              <motion.div
-                key={stallEvent.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                whileHover={{ y: -5 }}
+            <div>
+              <h2 className="text-3xl font-bold text-gray-800">
+                {searchQuery ? `Stall Results for "${searchQuery}"` : "Upcoming Stall Events"}
+              </h2>
+              <p className="text-gray-500 mt-2">Find the perfect stall for your business</p>
+            </div>
+            {filteredStallEvents.length === 0 && searchQuery && (
+              <Button
+                variant="outline"
+                onClick={() => window.location.href = "/"}
+                className="rounded-full border-gray-300 hover:border-primary hover:text-primary transition-all duration-300"
               >
-                <Link
-                  to={`/stalls/${stallEvent.id}`}
-                  className="group block bg-white/80 backdrop-blur-sm rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 h-full flex flex-col"
+                <Search className="mr-2 h-4 w-4" />
+                Clear Search
+              </Button>
+            )}
+          </motion.div>
+
+          {isLoading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : filteredStallEvents.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center py-16 bg-gray-50/50 rounded-2xl backdrop-blur-sm border border-gray-100"
+            >
+              <Search className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-xl text-gray-600 mb-2">No stall events found</p>
+              <p className="text-gray-500">Try adjusting your search criteria</p>
+            </motion.div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredStallEvents.map(stallEvent => (
+                <motion.div
+                  key={stallEvent.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  whileHover={{ y: -5 }}
                 >
-                  <div className="relative h-52 overflow-hidden">
-                    <img
-                      src={`http://localhost:3000/uploads/${stallEvent.banner_image}`}
-                      alt={stallEvent.title}
-                      className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-4 py-1 rounded-full text-sm font-semibold text-primary shadow-sm">
-                      ${stallEvent.price}
+                  <Link
+                    to={`/stalls/${stallEvent.id}`}
+                    className="group block bg-white/80 backdrop-blur-sm rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 h-full flex flex-col"
+                  >
+                    <div className="relative h-52 overflow-hidden">
+                      <img
+                        src={`http://localhost:3000/uploads/${stallEvent.banner_image}`}
+                        alt={stallEvent.title}
+                        className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-4 py-1 rounded-full text-sm font-semibold text-primary shadow-sm">
+                        ${stallEvent.price}
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent h-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     </div>
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent h-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  </div>
-                  <div className="p-6 flex-grow">
-                    <h3 className="text-xl font-semibold group-hover:text-primary transition-colors duration-300 line-clamp-1 mb-2">
-                      {stallEvent.title}
-                    </h3>
-                    <p className="text-gray-600 mb-4 line-clamp-2 text-sm">{stallEvent.description}</p>
-                    <div className="space-y-2 border-t border-gray-100 pt-4 mt-4">
-                      <div className="flex items-center text-gray-500">
-                        <Calendar className="w-4 h-4 mr-2 text-primary/70" />
-                        <span className="text-sm">{new Date(stallEvent.start_date).toLocaleDateString(undefined, {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric'
-                        })}</span>
-                      </div>
-                      <div className="flex items-center text-gray-500">
-                        <Clock className="w-4 h-4 mr-2 text-primary/70" />
-                        <span className="text-sm">{new Date(stallEvent.start_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
-                      <div className="flex items-center text-gray-500">
-                        <MapPin className="w-4 h-4 mr-2 text-primary/70" />
-                        <span className="text-sm line-clamp-1">{stallEvent.location}</span>
+                    <div className="p-6 flex-grow">
+                      <h3 className="text-xl font-semibold group-hover:text-primary transition-colors duration-300 line-clamp-1 mb-2">
+                        {stallEvent.title}
+                      </h3>
+                      <p className="text-gray-600 mb-4 line-clamp-2 text-sm">{stallEvent.description}</p>
+                      <div className="space-y-2 border-t border-gray-100 pt-4 mt-4">
+                        <div className="flex items-center text-gray-500">
+                          <Calendar className="w-4 h-4 mr-2 text-primary/70" />
+                          <span className="text-sm">{new Date(stallEvent.start_date).toLocaleDateString(undefined, {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric'
+                          })}</span>
+                        </div>
+                        <div className="flex items-center text-gray-500">
+                          <Clock className="w-4 h-4 mr-2 text-primary/70" />
+                          <span className="text-sm">{new Date(stallEvent.start_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <div className="flex items-center text-gray-500">
+                          <MapPin className="w-4 h-4 mr-2 text-primary/70" />
+                          <span className="text-sm line-clamp-1">{stallEvent.location}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="px-6 pb-6 pt-0">
-                    <Button
-                      className="w-full rounded-full bg-gray-50 hover:bg-primary hover:text-white text-gray-700 transition-all duration-300"
-                      variant="outline"
-                    >
-                      View Details
-                      <ChevronRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-        )}
-      </section>
+                    <div className="px-6 pb-6 pt-0">
+                      <Button
+                        className="w-full rounded-full bg-gray-50 hover:bg-primary hover:text-white text-gray-700 transition-all duration-300"
+                        variant="outline"
+                      >
+                        View Details
+                        <ChevronRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Newsletter Section */}
       <section className="bg-gray-50/70 py-16">

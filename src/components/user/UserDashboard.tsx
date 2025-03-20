@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, MapPin, Clock, Ticket, Bell, User, ArrowRight, Download, Activity, Star, ChevronRight, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { DashboardService, BookingService } from "../../lib/api";
+import { DashboardService, BookingService, UserService } from "../../lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -21,11 +21,20 @@ interface Booking {
   start_date?: string;
 }
 
+interface UserProfile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: string;
+}
+
 const UserDashboard = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [bookingsLoading, setBookingsLoading] = useState(true);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -56,6 +65,20 @@ const UserDashboard = () => {
 
     fetchDashboardData();
     fetchUserBookings();
+  }, []);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await UserService.getUserProfile();
+        const userData = response.data.user;
+        setProfile(userData);
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+      }
+    };
+
+    fetchUserProfile();
   }, []);
 
   const formatDate = (dateString: string) => {
@@ -236,8 +259,8 @@ const UserDashboard = () => {
                   <div className="h-24 w-24 rounded-full bg-gradient-to-r from-blue-50 to-purple-50 flex items-center justify-center mb-5 shadow-inner border-4 border-white">
                     <User className="h-12 w-12 text-gray-500" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-800 mb-1">{dashboardData?.userName || "User"}</h3>
-                  <p className="text-gray-500 mb-6">{dashboardData?.userEmail || "user@example.com"}</p>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-1">{profile?.first_name + " " + profile?.last_name || "User"}</h3>
+                  <p className="text-gray-500 mb-6">{profile?.email || "user@example.com"}</p>
 
                   <div className="w-full mt-2 space-y-3">
                     <Link to="/profile">

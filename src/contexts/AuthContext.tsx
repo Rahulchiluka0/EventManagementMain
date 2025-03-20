@@ -38,9 +38,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       case "event_organizer":
         navigate("/organizer");
         break;
-      // case "stall_manager":
-      //   navigate("/stall-manager");
-      //   break;
+      case "stall_manager":
+        navigate("/stall-manager");
+        break;
       case "user":
         navigate("/");
         break;

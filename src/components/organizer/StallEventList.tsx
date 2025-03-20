@@ -203,12 +203,12 @@ const StallEventList = () => {
                         <AlertTriangle className="h-4 w-4" />
                         <AlertTitle className="text-red-800 font-medium">Rejection Feedback</AlertTitle>
                         <AlertDescription className="text-red-700">
-                          {event.admin_feedback}
+                          - {event.admin_feedback}
                           <div className="mt-2 text-sm">
                             <p className="font-medium">Please make the necessary changes and resubmit your event for verification.</p>
                           </div>
                         </AlertDescription>
-                        <div className="mt-3">
+                        {/* <div className="mt-3">
                           <Button 
                             variant="outline" 
                             size="sm"
@@ -220,7 +220,7 @@ const StallEventList = () => {
                               Edit & Resubmit
                             </Link>
                           </Button>
-                        </div>
+                        </div> */}
                       </Alert>
                     )}
 

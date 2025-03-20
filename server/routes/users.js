@@ -11,7 +11,7 @@ router.get('/profile', authenticate, async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT id, email, first_name, last_name, role, verification_status, 
-              phone, profile_image, created_at
+              phone, created_at
        FROM users WHERE id = $1`,
       [req.user.id]
     );
@@ -29,16 +29,15 @@ router.get('/profile', authenticate, async (req, res, next) => {
 // Update user profile
 router.put('/profile', authenticate, async (req, res, next) => {
   try {
-    const { firstName, lastName, phone, profileImage } = req.body;
+    const { first_name, last_name, phone } = req.body;
 
     const result = await db.query(
       `UPDATE users
-       SET first_name = $1, last_name = $2, phone = $3, 
-           profile_image = $4, updated_at = NOW()
-       WHERE id = $5
+       SET first_name = $1, last_name = $2, phone = $3, updated_at = NOW()
+       WHERE id = $4
        RETURNING id, email, first_name, last_name, role, verification_status, 
-                 phone, profile_image, created_at`,
-      [firstName, lastName, phone, profileImage, req.user.id]
+                 phone, created_at`,
+      [first_name, last_name, phone, req.user.id]
     );
 
     res.json({
@@ -220,8 +219,8 @@ router.put('/verify/:id', authenticate, authorize('admin'), async (req, res, nex
     if (status === 'verified') {
       message = `Your account has been verified. You can now access all features.`;
     } else {
-      message = note 
-        ? `Your account verification was rejected: ${note}` 
+      message = note
+        ? `Your account verification was rejected: ${note}`
         : `Your account verification was rejected. Please contact support for more information.`;
     }
 
@@ -289,23 +288,23 @@ router.get('/pending-verification', authenticate, authorize('admin'), async (req
 router.get('/organizer-profile/:id', authenticate, async (req, res, next) => {
   try {
     const userId = req.params.id;
-    
+
     // Verify the user is accessing their own profile or is an admin
     if (req.user.id !== userId && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Unauthorized access to this profile' });
     }
-    
+
     // Get user data
     const userResult = await db.query(
       `SELECT id, email, first_name, last_name, role, phone
        FROM users WHERE id = $1`,
       [userId]
     );
-    
+
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     // Get organizer profile data with image paths
     const profileResult = await db.query(
       `SELECT organization_name, website, description, tax_id, event_types,
@@ -313,13 +312,13 @@ router.get('/organizer-profile/:id', authenticate, async (req, res, next) => {
        FROM organizer_profiles WHERE user_id = $1`,
       [userId]
     );
-    
+
     // Combine user and profile data
     const userData = {
       ...userResult.rows[0],
       ...(profileResult.rows[0] || {})
     };
-    
+
     res.json(userData);
   } catch (error) {
     next(error);

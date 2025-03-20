@@ -208,6 +208,12 @@ router.post('/refresh-token', async (req, res, next) => {
       return res.status(401).json({ message: 'Refresh token not found' });
     }
 
+    // Check if REFRESH_TOKEN_SECRET is set
+    if (!process.env.REFRESH_TOKEN_SECRET) {
+      console.error('REFRESH_TOKEN_SECRET environment variable is not set');
+      return res.status(500).json({ message: 'Server configuration error' });
+    }
+
     // Verify token exists in database and not expired
     const tokenResult = await db.query(
       `SELECT * FROM refresh_tokens 
@@ -466,7 +472,7 @@ router.put('/reapply-organizer', organizerUpload, async (req, res, next) => {
   try {
     console.log('Received organizer reapplication request:', req.body);
     console.log('Files received for reapplication:', req.files);
-    
+
     const {
       userId, organizationName, website, description,
       taxId, eventTypes
@@ -525,14 +531,14 @@ router.put('/reapply-organizer', organizerUpload, async (req, res, next) => {
              updated_at = NOW()
          WHERE user_id = $9`,
         [
-          organizationName, 
-          website || null, 
+          organizationName,
+          website || null,
           description,
           taxId || null,
           JSON.stringify(parsedEventTypes), // Convert to valid JSON string
-          panCardPath, 
-          canceledCheckPath, 
-          agreementPath, 
+          panCardPath,
+          canceledCheckPath,
+          agreementPath,
           userId
         ]
       );
@@ -544,14 +550,14 @@ router.put('/reapply-organizer', organizerUpload, async (req, res, next) => {
           event_types, pan_card_path, canceled_check_path, agreement_path)
          VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)`,
         [
-          userId, 
-          organizationName, 
-          website || null, 
-          description, 
+          userId,
+          organizationName,
+          website || null,
+          description,
           taxId || null,
           JSON.stringify(parsedEventTypes), // Convert to valid JSON string
-          panCardPath, 
-          canceledCheckPath, 
+          panCardPath,
+          canceledCheckPath,
           agreementPath
         ]
       );

@@ -4,6 +4,9 @@ import { Calendar, Clock, MapPin, Share2, Tent } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { StallService } from "../lib/api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 // Define TypeScript interfaces for type safety
 interface Stall {
@@ -39,6 +42,9 @@ const StallEventDetails = () => {
     const navigate = useNavigate();
     const { toast } = useToast();
     const [stallEvent, setStallEvent] = useState<StallEvent | null>(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [selectedStall, setSelectedStall] = useState<Stall | null>(null);
+    const [requestMessage, setRequestMessage] = useState("");
 
     useEffect(() => {
         const fetchStallEvent = async () => {
@@ -94,21 +100,34 @@ const StallEventDetails = () => {
         }
     };
 
-    const handleRegisterStall = async (stallId: string) => {
-        if (!stallEvent) return;
+    const openRequestDialog = (stall: Stall) => {
+        setSelectedStall(stall);
+        setRequestMessage("I would like to book this stall for the event.");
+        setDialogOpen(true);
+    };
+
+    const handleRequestSubmit = async () => {
+        if (!stallEvent || !selectedStall) return;
 
         try {
-            await StallService.requestStall(stallId, stallEvent.id);
+            await StallService.requestStall(
+                {
+                    stallEventId: stallEvent.id,
+                    stallId: selectedStall.id,
+                    requestMessage: requestMessage
+                }
+            );
             toast({
-                title: "Stall Registered",
-                description: "You have successfully registered for the stall.",
+                title: "Stall Requested",
+                description: "Your stall request has been submitted successfully.",
             });
+            setDialogOpen(false);
         } catch (error) {
-            console.error("Error registering stall:", error);
+            console.error("Error requesting stall:", error);
             toast({
                 variant: "destructive",
                 title: "Error",
-                description: "Failed to register for the stall. Please try again.",
+                description: "Failed to submit stall request. Please try again.",
             });
         }
     };
@@ -211,7 +230,7 @@ const StallEventDetails = () => {
                                                     {stall.is_available && (
                                                         <Button
                                                             className="mt-4 w-full"
-                                                            onClick={() => handleRegisterStall(stall.id)}
+                                                            onClick={() => openRequestDialog(stall)}
                                                         >
                                                             Register Stall
                                                         </Button>
@@ -243,6 +262,36 @@ const StallEventDetails = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Stall Request Dialog */}
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Request Stall</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="request-message">Request Message (Optional)</Label>
+                            <Textarea
+                                id="request-message"
+                                placeholder="Enter your request message here..."
+                                value={requestMessage}
+                                onChange={(e) => setRequestMessage(e.target.value)}
+                                className="resize-none"
+                                rows={4}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleRequestSubmit}>
+                            Submit Request
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

@@ -43,6 +43,9 @@ interface Stall {
   event_id: string;
 }
 
+// Inside the EventVerification component, we need to update the Dialog content
+// to display stalls information similar to StallEventVerification.tsx
+
 const EventVerification = () => {
   const { toast } = useToast();
   const [events, setEvents] = useState<Event[]>([]);
@@ -84,6 +87,7 @@ const EventVerification = () => {
       setEvents(prev => prev.filter(event => event.id !== eventId));
       setSelectedEvent(null);
       setFeedback("");
+      setDetailsOpen(false)
     } catch (error) {
       toast({
         title: "Operation Failed",
@@ -324,143 +328,131 @@ const EventVerification = () => {
 
       {/* Event Details Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold">{viewEvent?.title}</DialogTitle>
-            <DialogDescription>
-              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 mt-2">
-                {viewEvent?.event_type}
-              </Badge>
-            </DialogDescription>
-          </DialogHeader>
-
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           {viewEvent && (
-            <div className="space-y-6 py-4">
-              {/* Event Image */}
-              {viewEvent.image_url && (
-                <div className="rounded-lg overflow-hidden h-64 w-full">
-                  <img
-                    src={viewEvent.image_url}
-                    alt={viewEvent.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-
-              {/* Banner Image */}
-              {viewEvent.banner_image && (
-                <div className="mt-4">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Event Banner</h3>
-                  <div className="rounded-lg overflow-hidden h-32 w-full">
-                    <img
-                      src={`http://localhost:3000/uploads/${viewEvent.banner_image}`}
-                      alt={`${viewEvent.title} banner`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
-              )}
+            <div className="space-y-6">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold flex items-center">
+                  {viewEvent.title}
+                  <Badge variant="outline" className="ml-3 bg-amber-50 text-amber-700 border-amber-200">
+                    {viewEvent.event_type}
+                  </Badge>
+                </DialogTitle>
+                <DialogDescription>
+                  Submitted by {viewEvent.organizer_name} on {formatDate(viewEvent.created_at)}
+                </DialogDescription>
+              </DialogHeader>
 
               {/* Event Details */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500">Description</h3>
-                    <p className="mt-1 text-gray-800">{viewEvent.description}</p>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Description</h3>
+                    <p className="text-gray-800">{viewEvent.description}</p>
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500">Organizer</h3>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Location</h3>
                     <p className="mt-1 text-gray-800 flex items-center">
-                      <User className="h-4 w-4 mr-2 text-gray-400" />
-                      {viewEvent.organizer_name}
+                      <MapPin className="h-4 w-4 mr-2 text-blue-400" />
+                      {viewEvent.location}
                     </p>
                   </div>
-
-                  {viewEvent.location && (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">Location</h3>
-                      <p className="mt-1 text-gray-800 flex items-center">
-                        <MapPin className="h-4 w-4 mr-2 text-gray-400" />
-                        {viewEvent.location}
-                      </p>
-                    </div>
-                  )}
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500">Date & Time</h3>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Date & Time</h3>
                     <p className="mt-1 text-gray-800 flex items-center">
-                      <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                      {formatDate(viewEvent.start_date)}
+                      <Calendar className="h-4 w-4 mr-2 text-blue-400" />
+                      Start: {formatDate(viewEvent.start_date)}
                     </p>
                     {viewEvent.end_date && (
                       <p className="mt-1 text-gray-800 flex items-center">
-                        <Clock className="h-4 w-4 mr-2 text-gray-400" />
-                        End Date: {formatDate(viewEvent.end_date)}
+                        <Clock className="h-4 w-4 mr-2 text-blue-400" />
+                        End: {formatDate(viewEvent.end_date)}
                       </p>
                     )}
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500">Capacity</h3>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Organizer</h3>
                     <p className="mt-1 text-gray-800 flex items-center">
-                      <Users className="h-4 w-4 mr-2 text-gray-400" />
-                      {viewEvent.max_capacity} attendees
+                      <User className="h-4 w-4 mr-2 text-blue-400" />
+                      {viewEvent.organizer_name}
                     </p>
                   </div>
 
-                  {viewEvent.ticket_price !== undefined && (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">Ticket Price</h3>
-                      <p className="mt-1 text-gray-800">
-                        ${viewEvent.ticket_price.toFixed(2)}
-                      </p>
-                    </div>
-                  )}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Capacity</h3>
+                    <p className="mt-1 text-gray-800 flex items-center">
+                      <Users className="h-4 w-4 mr-2 text-blue-400" />
+                      {viewEvent.max_capacity} attendees
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              {/* Stalls Information */}
-              {viewEvent.stalls && viewEvent.stalls.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">Stalls Information</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Size</TableHead>
-                        <TableHead>Location</TableHead>
-                        <TableHead>Registration Fee</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {viewEvent.stalls.map((stall) => (
-                        <TableRow key={stall.id}>
-                          <TableCell className="font-medium">{stall.name}</TableCell>
-                          <TableCell>{stall.description}</TableCell>
-                          <TableCell>{stall.size}</TableCell>
-                          <TableCell>{stall.location_in_venue || "Not specified"}</TableCell>
-                          <TableCell>${parseFloat(stall.price).toLocaleString()}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+              {/* Stalls Information - Added similar to StallEventVerification.tsx */}
+              <div className="mt-6">
+                <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
+                  <Store className="h-5 w-5 mr-2 text-blue-500" />
+                  Stalls Information ({viewEvent.stalls?.length || 0})
+                </h3>
+
+                {viewEvent.stalls && viewEvent.stalls.length > 0 ? (
+                  <div className="bg-blue-50/30 backdrop-blur-sm p-4 rounded-xl border border-blue-100/50">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-blue-50/50">
+                          <tr>
+                            <th className="px-4 py-2 text-left font-medium text-blue-700">Name</th>
+                            <th className="px-4 py-2 text-left font-medium text-blue-700">Description</th>
+                            <th className="px-4 py-2 text-left font-medium text-blue-700">Size</th>
+                            <th className="px-4 py-2 text-left font-medium text-blue-700">Location</th>
+                            <th className="px-4 py-2 text-left font-medium text-blue-700">Price</th>
+                            <th className="px-4 py-2 text-left font-medium text-blue-700">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {viewEvent.stalls.map((stall) => (
+                            <tr key={stall.id} className="hover:bg-blue-50/30 transition-colors duration-200">
+                              <td className="px-4 py-3 font-medium">{stall.name}</td>
+                              <td className="px-4 py-3">{stall.description}</td>
+                              <td className="px-4 py-3">{stall.size}</td>
+                              <td className="px-4 py-3">{stall.location_in_venue || "Not specified"}</td>
+                              <td className="px-4 py-3 font-medium">${parseFloat(stall.price).toLocaleString()}</td>
+                              <td className="px-4 py-3">
+                                <Badge variant={stall.is_available ? "success" : "secondary"}>
+                                  {stall.is_available ? "Available" : "Reserved"}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 p-4 rounded-lg text-center text-gray-500">
+                    No stalls have been added to this event.
+                  </div>
+                )}
+              </div>
 
               {/* Verification Actions */}
-              <div className="mt-6 pt-4 border-t border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Verification Actions</h3>
+              <div className="mt-8 pt-6 border-t border-gray-100">
+                <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
+                  <MessageSquare className="h-5 w-5 mr-2 text-gray-500" />
+                  Verification Actions
+                </h3>
                 <Textarea
                   placeholder="Provide feedback to the organizer (optional)"
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
-                  className="min-h-[80px] text-sm mb-4"
+                  className="min-h-[100px] text-sm mb-6"
                 />
-                <div className="flex justify-end space-x-3">
+                <div className="flex justify-end space-x-4">
                   <Button
                     variant="outline"
                     onClick={() => setDetailsOpen(false)}
@@ -469,22 +461,16 @@ const EventVerification = () => {
                   </Button>
                   <Button
                     className="bg-red-500 hover:bg-red-600 text-white"
-                    onClick={() => {
-                      handleVerification(viewEvent.id, "rejected");
-                      setDetailsOpen(false);
-                    }}
+                    onClick={() => handleVerification(viewEvent.id, "rejected")}
                   >
-                    <X className="h-4 w-4 mr-1" />
+                    <X className="h-4 w-4 mr-2" />
                     Reject Event
                   </Button>
                   <Button
                     className="bg-green-500 hover:bg-green-600 text-white"
-                    onClick={() => {
-                      handleVerification(viewEvent.id, "approved");
-                      setDetailsOpen(false);
-                    }}
+                    onClick={() => handleVerification(viewEvent.id, "approved")}
                   >
-                    <Check className="h-4 w-4 mr-1" />
+                    <Check className="h-4 w-4 mr-2" />
                     Approve Event
                   </Button>
                 </div>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Check, X, FileText, ExternalLink, Building, Globe, FileIcon, CreditCard, FileCheck } from "lucide-react";
+import { Check, X, FileText, ExternalLink, Building, Globe, FileIcon, CreditCard, FileCheck, User, Calendar } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { UserService } from "../../lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { motion } from "framer-motion";
 
 interface User {
   id: string;
@@ -41,7 +42,6 @@ const UsersVerification = () => {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [approvalNote, setApprovalNote] = useState("");
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
-
 
   useEffect(() => {
     const fetchPendingUsers = async () => {
@@ -103,7 +103,7 @@ const UsersVerification = () => {
       day: 'numeric'
     });
   };
-  // Add a function to determine document type
+
   const getDocumentType = (path: string): 'image' | 'pdf' | 'other' => {
     const lowerPath = path.toLowerCase();
     if (lowerPath.endsWith('.pdf')) return 'pdf';
@@ -124,282 +124,303 @@ const UsersVerification = () => {
       title
     });
   };
+
   if (loading) {
-    return <div className="text-center py-8">Loading verifications...</div>;
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-gray-500 text-sm font-medium">Loading verifications...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Pending Verifications ({users.length})</CardTitle>
+    <div className="space-y-8 pb-8 ml-4">
+      {/* Header Section */}
+      <div className="bg-gradient-to-r from-gray-50 to-white rounded-2xl p-6 border border-gray-100 shadow-sm mb-8">
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">User Verification</h1>
+        <p className="text-gray-600">Review and approve user verification requests.</p>
+      </div>
+
+      <Card className="bg-white/80 backdrop-blur-sm border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
+        <CardHeader className="pb-4 border-b border-gray-50">
+          <CardTitle className="text-xl font-semibold text-gray-800 flex items-center">
+            <User className="h-5 w-5 mr-2 text-blue-500" />
+            Pending Verifications ({users.length})
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[600px]">
+        <CardContent className="pt-6">
+          <ScrollArea className="h-[600px] pr-4">
             <div className="space-y-6">
-              {users.map((user) => (
-                <Collapsible key={user.id} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-medium">{`${user.first_name} ${user.last_name}`}</h3>
-                      <p className="text-sm text-muted-foreground">{user.email}</p>
-                      <div className="flex items-center mt-1">
-                        <Badge variant="outline" className="capitalize">
-                          {user.role.replace(/_/g, ' ')}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground ml-2">
-                          Registered: {formatDate(user.created_at)}
+              {users.map((user, index) => (
+                <motion.div
+                  key={user.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
+                >
+                  <Collapsible className="border border-gray-100 rounded-xl p-5 bg-white/90 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <h3 className="font-semibold text-gray-800 text-lg">{`${user.first_name} ${user.last_name}`}</h3>
+                        <p className="text-gray-500 flex items-center">
+                          <Globe className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
+                          {user.email}
                         </p>
+                        <div className="flex items-center mt-2 space-x-3">
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 capitalize">
+                            {user.role.replace(/_/g, ' ')}
+                          </Badge>
+                          <p className="text-xs text-gray-500 flex items-center">
+                            <Calendar className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
+                            Registered: {formatDate(user.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex space-x-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-green-200 text-green-600 hover:bg-green-600 hover:text-white transition-colors duration-300"
+                          onClick={() => handleVerification(user.id, 'verified')}
+                        >
+                          <Check className="h-4 w-4 mr-1.5" />
+                          Approve
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-red-200 text-red-600 hover:bg-red-600 hover:text-white transition-colors duration-300"
+                          onClick={() => openRejectionDialog(user.id)}
+                        >
+                          <X className="h-4 w-4 mr-1.5" />
+                          Reject
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-green-600"
-                        onClick={() => handleVerification(user.id, 'verified')}
-                      >
-                        <Check className="h-4 w-4 mr-1" />
-                        Approve
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-red-600"
-                        onClick={() => openRejectionDialog(user.id)}
-                      >
-                        <X className="h-4 w-4 mr-1" />
-                        Reject
-                      </Button>
-                    </div>
-                  </div>
 
-                  {user.role === 'event_organizer' && (
-                    <>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="w-full justify-start mt-2">
-                          <FileText className="h-4 w-4 mr-2" />
-                          View Organizer Details
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="mt-4 space-y-4 bg-gray-50 p-4 rounded-md">
-                        {/* Organization Details */}
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium flex items-center">
-                            <Building className="h-4 w-4 mr-2" />
-                            Organization Details
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
-                            <div>
-                              <p className="text-xs text-muted-foreground">Organization Name</p>
-                              <p className="text-sm">{user.organization_name || 'Not provided'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Tax ID</p>
-                              <p className="text-sm">{user.tax_id || 'Not provided'}</p>
-                            </div>
-                            {user.website && (
+                    {user.role === 'event_organizer' && (
+                      <>
+                        <CollapsibleTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start mt-4 text-blue-600 hover:text-blue-700 hover:bg-blue-50/50 transition-colors duration-300"
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            View Organizer Details
+                          </Button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-4 space-y-6 bg-blue-50/30 backdrop-blur-sm p-5 rounded-xl border border-blue-100/50">
+                          {/* Organization Details */}
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-medium text-gray-800 flex items-center">
+                              <Building className="h-4 w-4 mr-2 text-blue-500" />
+                              Organization Details
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pl-6 bg-white/70 p-4 rounded-lg">
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 mb-1">Organization Name</p>
+                                <p className="text-sm text-gray-800">{user.organization_name || 'Not provided'}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 mb-1">Tax ID</p>
+                                <p className="text-sm text-gray-800">{user.tax_id || 'Not provided'}</p>
+                              </div>
+                              {user.website && (
+                                <div className="col-span-2">
+                                  <p className="text-xs font-medium text-gray-500 flex items-center mb-1">
+                                    <Globe className="h-3 w-3 mr-1 text-blue-500" />
+                                    Website
+                                  </p>
+                                  <a
+                                    href={user.website.startsWith('http') ? user.website : `https://${user.website}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center transition-colors duration-300"
+                                  >
+                                    {user.website}
+                                    <ExternalLink className="h-3 w-3 ml-1" />
+                                  </a>
+                                </div>
+                              )}
                               <div className="col-span-2">
-                                <p className="text-xs text-muted-foreground flex items-center">
-                                  <Globe className="h-3 w-3 mr-1" />
-                                  Website
-                                </p>
-                                <a
-                                  href={user.website.startsWith('http') ? user.website : `https://${user.website}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-sm text-blue-600 hover:underline flex items-center"
-                                >
-                                  {user.website}
-                                  <ExternalLink className="h-3 w-3 ml-1" />
-                                </a>
+                                <p className="text-xs font-medium text-gray-500 mb-1">Description</p>
+                                <p className="text-sm text-gray-800 bg-white/50 p-3 rounded-md">{user.description || 'Not provided'}</p>
                               </div>
-                            )}
-                            <div className="col-span-2">
-                              <p className="text-xs text-muted-foreground">Description</p>
-                              <p className="text-sm">{user.description || 'Not provided'}</p>
                             </div>
                           </div>
-                        </div>
 
-                        {/* Event Types */}
-                        {user.event_types && user.event_types.length > 0 && (
-                          <div className="space-y-2">
-                            <h4 className="text-sm font-medium">Event Types</h4>
-                            <div className="flex flex-wrap gap-2 pl-6">
-                              {user.event_types.map((type, index) => (
-                                <Badge key={index} variant="outline">{type}</Badge>
-                              ))}
+                          {/* Event Types */}
+                          {user.event_types && user.event_types.length > 0 && (
+                            <div className="space-y-3">
+                              <h4 className="text-sm font-medium text-gray-800 flex items-center">
+                                <Calendar className="h-4 w-4 mr-2 text-blue-500" />
+                                Event Types
+                              </h4>
+                              <div className="flex flex-wrap gap-2 pl-6 bg-white/70 p-4 rounded-lg">
+                                {user.event_types.map((type, index) => (
+                                  <Badge
+                                    key={index}
+                                    variant="outline"
+                                    className="bg-blue-50/70 text-blue-700 border-blue-200"
+                                  >
+                                    {type}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Documents */}
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-medium text-gray-800 flex items-center">
+                              <FileIcon className="h-4 w-4 mr-2 text-blue-500" />
+                              Verification Documents
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pl-6">
+                              {user.pan_card_path && (
+                                <div className="border border-gray-100 rounded-lg p-4 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300">
+                                  <p className="text-xs font-medium text-gray-500 flex items-center mb-3">
+                                    <CreditCard className="h-3.5 w-3.5 mr-1.5 text-blue-500" />
+                                    PAN Card
+                                  </p>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full text-blue-600 border-blue-200 hover:bg-blue-600 hover:text-white transition-colors duration-300"
+                                    onClick={() => openDocumentDialog(user.pan_card_path, "PAN Card")}
+                                  >
+                                    View Document
+                                    <FileText className="h-3.5 w-3.5 ml-1.5" />
+                                  </Button>
+                                </div>
+                              )}
+
+                              {user.canceled_check_path && (
+                                <div className="border border-gray-100 rounded-lg p-4 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300">
+                                  <p className="text-xs font-medium text-gray-500 flex items-center mb-3">
+                                    <FileCheck className="h-3.5 w-3.5 mr-1.5 text-blue-500" />
+                                    Canceled Check
+                                  </p>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full text-blue-600 border-blue-200 hover:bg-blue-600 hover:text-white transition-colors duration-300"
+                                    onClick={() => openDocumentDialog(user.canceled_check_path, "Canceled Check")}
+                                  >
+                                    View Document
+                                    <FileText className="h-3.5 w-3.5 ml-1.5" />
+                                  </Button>
+                                </div>
+                              )}
+
+                              {user.agreement_path && (
+                                <div className="border border-gray-100 rounded-lg p-4 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300">
+                                  <p className="text-xs font-medium text-gray-500 flex items-center mb-3">
+                                    <FileCheck className="h-3.5 w-3.5 mr-1.5 text-blue-500" />
+                                    Agreement Document
+                                  </p>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full text-blue-600 border-blue-200 hover:bg-blue-600 hover:text-white transition-colors duration-300"
+                                    onClick={() => openDocumentDialog(user.agreement_path, "Agreement Document")}
+                                  >
+                                    View Document
+                                    <FileText className="h-3.5 w-3.5 ml-1.5" />
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           </div>
-                        )}
-
-                        {/* Documents */}
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium flex items-center">
-                            <FileIcon className="h-4 w-4 mr-2" />
-                            Verification Documents
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pl-6">
-                            {user.pan_card_path && (
-                              <div className="border rounded p-3 bg-white">
-                                <p className="text-xs text-muted-foreground flex items-center mb-2">
-                                  <CreditCard className="h-3 w-3 mr-1" />
-                                  PAN Card
-                                </p>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-blue-600 p-0 h-auto hover:text-blue-800"
-                                  onClick={() => openDocumentDialog(user.pan_card_path, "PAN Card")}
-                                >
-                                  View Document
-                                  <FileText className="h-3 w-3 ml-1" />
-                                </Button>
-                              </div>
-                            )}
-
-                            {user.canceled_check_path && (
-                              <div className="border rounded p-3 bg-white">
-                                <p className="text-xs text-muted-foreground flex items-center mb-2">
-                                  <FileCheck className="h-3 w-3 mr-1" />
-                                  Canceled Check
-                                </p>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-blue-600 p-0 h-auto hover:text-blue-800"
-                                  onClick={() => openDocumentDialog(user.canceled_check_path, "Canceled Check")}
-                                >
-                                  View Document
-                                  <FileText className="h-3 w-3 ml-1" />
-                                </Button>
-                              </div>
-                            )}
-
-                            {user.agreement_path && (
-                              <div className="border rounded p-3 bg-white">
-                                <p className="text-xs text-muted-foreground flex items-center mb-2">
-                                  <FileText className="h-3 w-3 mr-1" />
-                                  Agreement
-                                </p>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-blue-600 p-0 h-auto hover:text-blue-800"
-                                  onClick={() => openDocumentDialog(user.agreement_path, "Agreement")}
-                                >
-                                  View Document
-                                  <FileText className="h-3 w-3 ml-1" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </CollapsibleContent>
-                    </>
-                  )}
-                </Collapsible>
+                        </CollapsibleContent>
+                      </>
+                    )}
+                  </Collapsible>
+                </motion.div>
               ))}
+
               {users.length === 0 && (
-                <p className="text-muted-foreground text-center py-4">
-                  No pending verifications
-                </p>
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="rounded-full bg-gray-50 p-3 mb-4">
+                    <Check className="h-6 w-6 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-1">No pending verifications</h3>
+                  <p className="text-gray-500 max-w-sm">
+                    All user verification requests have been processed. Check back later for new submissions.
+                  </p>
+                </div>
               )}
             </div>
           </ScrollArea>
-
-          {/* Pagination Controls */}
-          <div className="flex justify-center gap-2 mt-4">
-            {Array.from({ length: totalPages }, (_, i) => (
-              <Button
-                key={i + 1}
-                variant={currentPage === i + 1 ? "default" : "outline"}
-                onClick={() => setCurrentPage(i + 1)}
-              >
-                {i + 1}
-              </Button>
-            ))}
-          </div>
         </CardContent>
       </Card>
-      {/* Document Viewer Dialog */}
-      <Dialog open={!!selectedDocument} onOpenChange={(open) => !open && setSelectedDocument(null)}>
-        <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{selectedDocument?.title}</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden flex items-center justify-center p-4">
-            {selectedDocument && (
-              <>
+
+      {/* Document Preview Dialog */}
+      <Dialog open={!!selectedDocument} onOpenChange={() => setSelectedDocument(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {selectedDocument && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-xl font-semibold">{selectedDocument.title}</DialogTitle>
+              </DialogHeader>
+              <div className="mt-4 flex justify-center">
                 {getDocumentType(selectedDocument.url) === 'image' ? (
-                  <div className="max-h-[60vh] flex items-center justify-center">
-                    <img
-                      src={selectedDocument.url}
-                      alt={selectedDocument.title}
-                      className="max-w-full max-h-full object-contain"
-                    />
-                  </div>
+                  <img
+                    src={selectedDocument.url}
+                    alt={selectedDocument.title}
+                    className="max-w-full max-h-[70vh] object-contain rounded-md shadow-md"
+                  />
                 ) : getDocumentType(selectedDocument.url) === 'pdf' ? (
                   <iframe
-                    src={`${selectedDocument.url}#toolbar=0&navpanes=0&scrollbar=1`}
-                    className="w-full h-full border-0"
+                    src={selectedDocument.url}
                     title={selectedDocument.title}
+                    className="w-full h-[70vh] rounded-md shadow-md"
                   />
                 ) : (
-                  <div className="text-center">
-                    <p>This document type cannot be previewed.</p>
+                  <div className="p-8 bg-gray-50 rounded-lg text-center">
+                    <FileIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                    <p className="text-gray-600">
+                      This document type cannot be previewed. Please download to view.
+                    </p>
                     <Button
-                      variant="outline"
+                      className="mt-4 bg-blue-600 hover:bg-blue-700 text-white"
                       onClick={() => window.open(selectedDocument.url, '_blank')}
-                      className="mt-4"
                     >
-                      Open in New Tab
-                      <ExternalLink className="h-4 w-4 ml-1" />
+                      Download Document
                     </Button>
                   </div>
                 )}
-              </>
-            )}
-          </div>
-          <div className="flex justify-end mt-4">
-            <Button
-              variant="outline"
-              onClick={() => window.open(selectedDocument?.url, '_blank')}
-              className="mr-2"
-            >
-              Open in New Tab
-              <ExternalLink className="h-4 w-4 ml-1" />
-            </Button>
-            <Button onClick={() => setSelectedDocument(null)}>
-              Close
-            </Button>
-          </div>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
-      {/* Rejection Note Dialog */}
+      {/* Rejection Dialog */}
       <Dialog open={rejectionDialogOpen} onOpenChange={setRejectionDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Reject Verification</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-gray-800">Reject Verification</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="rejection-note">Rejection Reason</Label>
-              <Textarea
-                id="rejection-note"
-                placeholder="Please provide a reason for rejection (e.g., 'Invalid PAN card', 'Blurry documents', etc.)"
-                value={rejectionNote}
-                onChange={(e) => setRejectionNote(e.target.value)}
-                className="min-h-[100px]"
-              />
-            </div>
+          <div className="mt-4">
+            <Label htmlFor="rejection-note" className="text-sm font-medium text-gray-700">
+              Provide a reason for rejection (optional)
+            </Label>
+            <Textarea
+              id="rejection-note"
+              placeholder="Explain why this verification is being rejected..."
+              value={rejectionNote}
+              onChange={(e) => setRejectionNote(e.target.value)}
+              className="mt-2 min-h-[120px]"
+            />
           </div>
-          <DialogFooter className="sm:justify-end">
+          <DialogFooter className="mt-6 flex justify-end space-x-3">
             <Button
-              type="button"
-              variant="secondary"
+              variant="outline"
               onClick={() => {
                 setRejectionDialogOpen(false);
                 setRejectionNote("");
@@ -409,12 +430,51 @@ const UsersVerification = () => {
               Cancel
             </Button>
             <Button
-              type="button"
-              variant="destructive"
+              className="bg-red-500 hover:bg-red-600 text-white"
               onClick={() => selectedUserId && handleVerification(selectedUserId, 'rejected', rejectionNote)}
-              disabled={!rejectionNote.trim()}
             >
-              Reject Verification
+              <X className="h-4 w-4 mr-2" />
+              Confirm Rejection
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approval Dialog */}
+      <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-gray-800">Approve Verification</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            <Label htmlFor="approval-note" className="text-sm font-medium text-gray-700">
+              Add a note (optional)
+            </Label>
+            <Textarea
+              id="approval-note"
+              placeholder="Add any notes for the user..."
+              value={approvalNote}
+              onChange={(e) => setApprovalNote(e.target.value)}
+              className="mt-2 min-h-[120px]"
+            />
+          </div>
+          <DialogFooter className="mt-6 flex justify-end space-x-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setApprovalDialogOpen(false);
+                setApprovalNote("");
+                setSelectedUserId(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-green-500 hover:bg-green-600 text-white"
+              onClick={() => selectedUserId && handleVerification(selectedUserId, 'verified', approvalNote)}
+            >
+              <Check className="h-4 w-4 mr-2" />
+              Confirm Approval
             </Button>
           </DialogFooter>
         </DialogContent>

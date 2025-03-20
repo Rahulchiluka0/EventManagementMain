@@ -837,19 +837,25 @@ router.get('/admin/pending', authenticate, authorize('admin'), async (req, res, 
     const offset = (page - 1) * limit;
 
     const query = `
-      SELECT se.*, u.first_name || ' ' || u.last_name as organizer_name,
-             COUNT(s.id) as stall_count,
-             COUNT(s.id) FILTER (WHERE s.is_available = true) as available_stall_count
+      SELECT se.*, u.first_name || ' ' || u.last_name as organizer_name
       FROM stall_events se
       JOIN users u ON se.organizer_id = u.id
-      LEFT JOIN stalls s ON se.id = s.stall_event_id
       WHERE se.verification_status = 'pending'
-      GROUP BY se.id, u.first_name, u.last_name
       ORDER BY se.created_at ASC
       LIMIT $1 OFFSET $2
     `;
 
     const result = await db.query(query, [parseInt(limit), offset]);
+
+    // Get stalls for each stall event
+    const stallEvents = result.rows;
+    for (const event of stallEvents) {
+      const stallsResult = await db.query(
+        'SELECT * FROM stalls WHERE stall_event_id = $1',
+        [event.id]
+      );
+      event.stalls = stallsResult.rows;
+    }
 
     // Count total pending
     const countResult = await db.query(
@@ -860,7 +866,7 @@ router.get('/admin/pending', authenticate, authorize('admin'), async (req, res, 
     const totalPending = parseInt(countResult.rows[0].count);
 
     res.json({
-      stallEvents: result.rows,
+      stallEvents: stallEvents,
       pagination: {
         total: totalPending,
         page: parseInt(page),

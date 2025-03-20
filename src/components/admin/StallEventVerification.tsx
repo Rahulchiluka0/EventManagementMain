@@ -18,6 +18,21 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 
+interface Stall {
+    id: string;
+    stall_event_id: string;
+    name: string;
+    description: string;
+    price: string;
+    size: string;
+    location_in_venue: string;
+    is_available: boolean;
+    manager_id: string | null;
+    created_at: string;
+    updated_at: string;
+    event_id: string | null;
+}
+
 interface StallEvent {
     id: string;
     title: string;
@@ -37,6 +52,7 @@ interface StallEvent {
     zip_code: string;
     banner_image: string;
     admin_feedback: string | null;
+    stalls: Stall[]; // Added stalls array
 }
 
 const StallEventVerification = () => {
@@ -70,6 +86,20 @@ const StallEventVerification = () => {
         fetchPendingEvents();
     }, [currentPage, toast]);
 
+    const handleViewDetails = (event: StallEvent) => {
+        setSelectedEventDetails(event);
+        setDetailsOpen(true);
+    };
+
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+        });
+    };
+
     const handleVerification = async (eventId: string, status: string) => {
         try {
             await StallService.verifyStallEvent(eventId, status, feedback);
@@ -80,6 +110,7 @@ const StallEventVerification = () => {
             setEvents(prev => prev.filter(event => event.id !== eventId));
             setSelectedEvent(null);
             setFeedback("");
+            setDetailsOpen(false);
         } catch (error) {
             toast({
                 title: "Operation Failed",
@@ -87,33 +118,6 @@ const StallEventVerification = () => {
                 variant: "destructive",
             });
         }
-    };
-
-    const handleViewDetails = async (event: StallEvent) => {
-        try {
-            // If you need to fetch more details, you can do it here
-            // const response = await StallService.getStallEventDetails(event.id);
-            // setSelectedEventDetails(response.data.stallEvent);
-
-            // For now, we'll just use the event data we already have
-            setSelectedEventDetails(event);
-            setDetailsOpen(true);
-        } catch (error) {
-            toast({
-                title: "Error",
-                description: "Failed to load event details",
-                variant: "destructive",
-            });
-        }
-    };
-
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-        });
     };
 
     if (loading) {
@@ -298,138 +302,149 @@ const StallEventVerification = () => {
 
             {/* Event Details Dialog */}
             <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle className="text-xl font-bold flex items-center">
-                            <Store className="h-5 w-5 mr-2 text-purple-600" />
-                            {selectedEventDetails?.title}
-                        </DialogTitle>
-                        <DialogDescription>
-                            Stall event details for verification
-                        </DialogDescription>
-                    </DialogHeader>
-
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                     {selectedEventDetails && (
-                        <div className="space-y-6 py-4">
-                            {/* Banner Image */}
-                            {selectedEventDetails.banner_image && (
-                                <div className="w-full h-48 rounded-lg overflow-hidden">
-                                    <img
-                                        src={`http://localhost:3000/uploads/${selectedEventDetails.banner_image}`}
-                                        alt={selectedEventDetails.title}
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                            )}
+                        <div className="space-y-6">
+                            <DialogHeader>
+                                <DialogTitle className="text-2xl font-bold flex items-center">
+                                    {selectedEventDetails.title}
+                                    <Badge variant="outline" className="ml-3 bg-amber-50 text-amber-700 border-amber-200">
+                                        Pending
+                                    </Badge>
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Submitted by {selectedEventDetails.organizer_name} on {formatDate(selectedEventDetails.created_at)}
+                                </DialogDescription>
+                            </DialogHeader>
 
                             {/* Event Details */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-6">
                                     <div>
-                                        <h3 className="text-sm font-medium text-gray-500">Description</h3>
-                                        <p className="mt-1 text-gray-800">{selectedEventDetails.description}</p>
+                                        <h3 className="text-sm font-medium text-gray-500 mb-2">Description</h3>
+                                        <p className="text-gray-800">{selectedEventDetails.description}</p>
                                     </div>
 
                                     <div>
-                                        <h3 className="text-sm font-medium text-gray-500">Location</h3>
-                                        <div className="mt-1 flex items-center space-x-1 text-gray-800">
-                                            <MapPin className="h-4 w-4 text-gray-400" />
-                                            <span>{selectedEventDetails.location}</span>
-                                            {selectedEventDetails.city && selectedEventDetails.country && (
-                                                <span> - {selectedEventDetails.city}, {selectedEventDetails.country}</span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="text-sm font-medium text-gray-500">Event Dates</h3>
-                                        <div className="mt-1 flex items-center space-x-1 text-gray-800">
-                                            <Calendar className="h-4 w-4 text-gray-400" />
-                                            <span>{formatDate(selectedEventDetails.start_date)} - {formatDate(selectedEventDetails.end_date)}</span>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="text-sm font-medium text-gray-500">Organizer</h3>
-                                        <div className="mt-1 flex items-center space-x-1 text-gray-800">
-                                            <User className="h-4 w-4 text-gray-400" />
-                                            <span>{selectedEventDetails.organizer_name}</span>
-                                        </div>
+                                        <h3 className="text-sm font-medium text-gray-500 mb-2">Location</h3>
+                                        <p className="mt-1 text-gray-800 flex items-center">
+                                            <MapPin className="h-4 w-4 mr-2 text-blue-400" />
+                                            {selectedEventDetails.location}
+                                        </p>
+                                        <p className="mt-1 text-gray-600 text-sm">
+                                            {selectedEventDetails.address}, {selectedEventDetails.city}, {selectedEventDetails.state}, {selectedEventDetails.country} {selectedEventDetails.zip_code}
+                                        </p>
                                     </div>
                                 </div>
 
-                                <div className="space-y-4">
+                                <div className="space-y-6">
                                     <div>
-                                        <h3 className="text-sm font-medium text-gray-500">Stall Information</h3>
-                                        <div className="mt-1 flex items-center space-x-1 text-gray-800">
-                                            <Store className="h-4 w-4 text-gray-400" />
-                                            <span>
-                                                {selectedEventDetails.stall_count || 0} stalls
-                                                ({selectedEventDetails.available_stall_count || 0} available)
-                                            </span>
-                                        </div>
+                                        <h3 className="text-sm font-medium text-gray-500 mb-2">Date & Time</h3>
+                                        <p className="mt-1 text-gray-800 flex items-center">
+                                            <Calendar className="h-4 w-4 mr-2 text-blue-400" />
+                                            Start: {formatDate(selectedEventDetails.start_date)}
+                                        </p>
+                                        <p className="mt-1 text-gray-800 flex items-center">
+                                            <Clock className="h-4 w-4 mr-2 text-blue-400" />
+                                            End: {formatDate(selectedEventDetails.end_date)}
+                                        </p>
                                     </div>
 
                                     <div>
-                                        <h3 className="text-sm font-medium text-gray-500">Submission Date</h3>
-                                        <div className="mt-1 flex items-center space-x-1 text-gray-800">
-                                            <Clock className="h-4 w-4 text-gray-400" />
-                                            <span>{formatDate(selectedEventDetails.created_at)}</span>
-                                        </div>
+                                        <h3 className="text-sm font-medium text-gray-500 mb-2">Organizer</h3>
+                                        <p className="mt-1 text-gray-800 flex items-center">
+                                            <User className="h-4 w-4 mr-2 text-blue-400" />
+                                            {selectedEventDetails.organizer_name}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Full Address */}
-                            {(selectedEventDetails.address || selectedEventDetails.city) && (
-                                <div className="mt-4">
-                                    <h3 className="text-sm font-medium text-gray-500">Full Address</h3>
-                                    <p className="mt-1 text-gray-800">
-                                        {selectedEventDetails.address && `${selectedEventDetails.address}, `}
-                                        {selectedEventDetails.city && `${selectedEventDetails.city}, `}
-                                        {selectedEventDetails.state && `${selectedEventDetails.state}, `}
-                                        {selectedEventDetails.country && `${selectedEventDetails.country} `}
-                                        {selectedEventDetails.zip_code && selectedEventDetails.zip_code}
-                                    </p>
+                            {/* Stalls Information */}
+                            <div className="mt-6">
+                                <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
+                                    <Store className="h-5 w-5 mr-2 text-blue-500" />
+                                    Stalls Information ({selectedEventDetails.stalls?.length || 0})
+                                </h3>
+
+                                {selectedEventDetails.stalls && selectedEventDetails.stalls.length > 0 ? (
+                                    <div className="bg-blue-50/30 backdrop-blur-sm p-4 rounded-xl border border-blue-100/50">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead className="bg-blue-50/50">
+                                                    <tr>
+                                                        <th className="px-4 py-2 text-left font-medium text-blue-700">Name</th>
+                                                        <th className="px-4 py-2 text-left font-medium text-blue-700">Description</th>
+                                                        <th className="px-4 py-2 text-left font-medium text-blue-700">Size</th>
+                                                        <th className="px-4 py-2 text-left font-medium text-blue-700">Location</th>
+                                                        <th className="px-4 py-2 text-left font-medium text-blue-700">Price</th>
+                                                        <th className="px-4 py-2 text-left font-medium text-blue-700">Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {selectedEventDetails.stalls.map((stall) => (
+                                                        <tr key={stall.id} className="hover:bg-blue-50/30 transition-colors duration-200">
+                                                            <td className="px-4 py-3 font-medium">{stall.name}</td>
+                                                            <td className="px-4 py-3">{stall.description}</td>
+                                                            <td className="px-4 py-3">{stall.size}</td>
+                                                            <td className="px-4 py-3">{stall.location_in_venue || "Not specified"}</td>
+                                                            <td className="px-4 py-3 font-medium">${parseFloat(stall.price).toLocaleString()}</td>
+                                                            <td className="px-4 py-3">
+                                                                <Badge variant={stall.is_available ? "success" : "secondary"}>
+                                                                    {stall.is_available ? "Available" : "Reserved"}
+                                                                </Badge>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="bg-gray-50 p-4 rounded-lg text-center text-gray-500">
+                                        No stalls have been added to this event.
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Verification Actions */}
+                            <div className="mt-8 pt-6 border-t border-gray-100">
+                                <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
+                                    <MessageSquare className="h-5 w-5 mr-2 text-gray-500" />
+                                    Verification Actions
+                                </h3>
+                                <Textarea
+                                    placeholder="Provide feedback to the organizer (optional)"
+                                    value={feedback}
+                                    onChange={(e) => setFeedback(e.target.value)}
+                                    className="min-h-[100px] text-sm mb-6"
+                                />
+                                <div className="flex justify-end space-x-4">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setDetailsOpen(false)}
+                                    >
+                                        Close
+                                    </Button>
+                                    <Button
+                                        className="bg-red-500 hover:bg-red-600 text-white"
+                                        onClick={() => handleVerification(selectedEventDetails.id, "rejected")}
+                                    >
+                                        <X className="h-4 w-4 mr-2" />
+                                        Reject Event
+                                    </Button>
+                                    <Button
+                                        className="bg-green-500 hover:bg-green-600 text-white"
+                                        onClick={() => handleVerification(selectedEventDetails.id, "verified")}
+                                    >
+                                        <Check className="h-4 w-4 mr-2" />
+                                        Approve Event
+                                    </Button>
                                 </div>
-                            )}
+                            </div>
                         </div>
                     )}
                 </DialogContent>
-                {/* <DialogFooter className="bg-gray-50 px-6 py-4">
-                    <div className="flex justify-between w-full">
-                        <Button
-                            variant="outline"
-                            onClick={() => setDetailsOpen(false)}
-                        >
-                            Close
-                        </Button>
-                        <div className="flex space-x-2">
-                            <Button
-                                variant="outline"
-                                className="bg-green-50 text-green-600 border-green-100 hover:bg-green-600 hover:text-white hover:border-green-600 transition-colors"
-                                onClick={() => {
-                                    handleVerification(selectedEventDetails!.id, "verified");
-                                    setDetailsOpen(false);
-                                }}
-                            >
-                                <Check className="h-4 w-4 mr-1" />
-                                Approve
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="bg-red-50 text-red-600 border-red-100 hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors"
-                                onClick={() => {
-                                    setSelectedEvent(selectedEventDetails!.id);
-                                    setDetailsOpen(false);
-                                }}
-                            >
-                                <X className="h-4 w-4 mr-1" />
-                                Reject
-                            </Button>
-                        </div>
-                    </div>
-                </DialogFooter> */}
             </Dialog>
         </div>
     );

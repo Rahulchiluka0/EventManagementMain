@@ -13,3 +13,9 @@ CREATE TABLE IF NOT EXISTS stalls (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   event_id UUID REFERENCES events(id) ON DELETE CASCADE
 );
+
+ALTER TABLE stalls ADD CONSTRAINT stall_association_check 
+CHECK (
+  (stall_event_id IS NOT NULL AND event_id IS NULL) OR 
+  (stall_event_id IS NULL AND event_id IS NOT NULL)
+);

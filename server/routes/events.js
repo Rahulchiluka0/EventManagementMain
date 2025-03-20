@@ -61,7 +61,8 @@ router.get('/', async (req, res, next) => {
 
     let query = `
       SELECT e.*, u.first_name || ' ' || u.last_name as organizer_name,
-      COUNT(ei.id) as image_count
+      COUNT(ei.id) as image_count,
+      EXISTS(SELECT 1 FROM stalls s WHERE s.event_id = e.id) as has_stalls
       FROM events e
       JOIN users u ON e.organizer_id = u.id
       LEFT JOIN event_images ei ON e.id = ei.event_id
@@ -194,9 +195,16 @@ router.get('/:id', async (req, res, next) => {
       [eventId]
     );
 
+    // Get stalls associated with this event
+    const stallsResult = await db.query(
+      'SELECT * FROM stalls WHERE event_id = $1',
+      [eventId]
+    );
+
     const eventWithImages = {
       ...event,
-      images: imagesResult.rows
+      images: imagesResult.rows,
+      stalls: stallsResult.rows
     };
 
     res.json({ event: eventWithImages });

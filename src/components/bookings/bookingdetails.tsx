@@ -466,7 +466,7 @@ const BookingDetails = () => {
                         </Button>
 
                         {/* Validate Ticket Button - For testing purposes */}
-                        <Button
+                        {/* <Button
                           className={`w-full transition-all duration-300 rounded-lg ${booking.is_used
                               ? 'bg-green-100 text-green-700 hover:bg-green-200 cursor-not-allowed'
                               : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800'
@@ -490,7 +490,7 @@ const BookingDetails = () => {
                               Validate Ticket
                             </>
                           )}
-                        </Button>
+                        </Button> */}
                       </div>
                     </>
                   ) : booking?.status === 'pending' ? (

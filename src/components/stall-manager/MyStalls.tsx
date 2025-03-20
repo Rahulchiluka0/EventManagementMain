@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Define TypeScript interfaces for type safety
 interface StallRequest {
@@ -23,12 +24,48 @@ interface StallRequest {
   revenue: string; // Assuming you want to display revenue
 }
 
+// Add interface for stall details
+interface StallDetails {
+  id: string;
+  stall_event_id: string;
+  name: string;
+  description: string;
+  price: string;
+  size: string;
+  status: string;
+  location_in_venue: string | null;
+  is_available: boolean;
+  manager_id: string;
+  created_at: string;
+  updated_at: string;
+  event_id: string | null;
+  event_title: string;
+  event_description: string;
+  start_date: string;
+  end_date: string;
+  location: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  zip_code: string;
+  organizer_name: string;
+  organizer_email: string;
+  organizer_phone: string;
+  revenue: string;
+  visitors: number;
+  request_message?: string;
+}
+
 const MyStalls = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [stallRequests, setStallRequests] = useState<StallRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedStall, setSelectedStall] = useState<StallDetails | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
     const fetchStallRequests = async () => {
@@ -50,8 +87,22 @@ const MyStalls = () => {
     fetchStallRequests();
   }, [toast]);
 
-  const handleViewDetails = (stallId: string) => {
-    navigate(`/stall-manager/stalls/${stallId}`);
+  const handleViewDetails = async (stallId: string) => {
+    try {
+      setLoadingDetails(true);
+      const response = await StallService.getStallDetail(stallId);
+      setSelectedStall(response.data.stallDetail);
+      setDialogOpen(true);
+    } catch (error) {
+      console.error("Error fetching stall details:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load stall details",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
   const filteredStalls = stallRequests.filter(stall =>
@@ -450,6 +501,111 @@ const MyStalls = () => {
           </div>
         </CardContent>
       </Card>
+      // Stall Details Dialog
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Stall Details</DialogTitle>
+          </DialogHeader>
+
+          {loadingDetails ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-red-600"></div>
+            </div>
+          ) : selectedStall ? (
+            <div className="space-y-6 py-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-800">{selectedStall.name}</h3>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-gray-700">{selectedStall.description}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-500">Price</p>
+                  <p className="font-medium">${selectedStall.price}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-500">Size</p>
+                  <p className="font-medium">{selectedStall.size}</p>
+                </div>
+                {selectedStall.location_in_venue && (
+                  <div className="space-y-1 col-span-2">
+                    <p className="text-sm text-gray-500">Location in Venue</p>
+                    <p className="font-medium">{selectedStall.location_in_venue}</p>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-800">Event Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center">
+                    <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-500">Event</p>
+                      <p className="font-medium">{selectedStall.event_title}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <MapPin className="h-4 w-4 mr-2 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-500">Location</p>
+                      <p className="font-medium">{selectedStall.location}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center col-span-2">
+                    <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-500">Dates</p>
+                      <p className="font-medium">
+                        {new Date(selectedStall.start_date).toLocaleDateString()} - {new Date(selectedStall.end_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {selectedStall.request_message && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-gray-800">Your Request Message</h4>
+                    <p className="text-gray-600 bg-gray-50 p-3 rounded-md italic">
+                      "{selectedStall.request_message}"
+                    </p>
+                  </div>
+                </>
+              )}
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                  Close
+                </Button>
+                {selectedStall.status === "verified" && (
+                  <Button
+                    onClick={() => {
+                      setDialogOpen(false);
+                      navigate(`/stall-manager/inventory/${selectedStall.id}`);
+                    }}
+                    className="bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800"
+                  >
+                    Manage Inventory
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="py-4 text-center text-gray-500">
+              No stall details available
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div >
   );
 };

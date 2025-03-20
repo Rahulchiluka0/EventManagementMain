@@ -44,10 +44,12 @@ const Login = () => {
         } else if (status === "verified") {
           navigate("/organizer");
         }
-      } else {
-        // For other users, navigate to the dashboard
-        navigate("/dashboard");
+      } else if (response?.user?.role === "user" || response?.user?.role === "stall_manager") {
+        navigate("/");
+      } else if (response?.user?.role === "admin") {
+        navigate("/admin");
       }
+
     } catch (error: any) {
       console.error('Login error:', error);
       if (error.response?.data?.message) {

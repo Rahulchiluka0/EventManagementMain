@@ -15,14 +15,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AuthService, UserService } from "@/lib/api";
+
+
+interface UserProfile {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+}
 
 const Navbar = () => {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { logout, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -32,6 +44,37 @@ const Navbar = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Fetch current user
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await AuthService.getCurrentUser();
+        setCurrentUser(response.data.user);
+      } catch (error) {
+        console.error("Error fetching current user:", error);
+        // If we can't fetch the user, we'll assume they're not logged in
+        setCurrentUser(null);
+      } finally {
+        setAuthChecked(true);
+      }
+    };
+
+    fetchCurrentUser();
+  }, [isAuthenticated]);
+
+  // Update currentUser when auth context user changes
+  useEffect(() => {
+    if (user) {
+      setCurrentUser({
+        id: user.id,
+        firstName: user.first_name || user.firstName,
+        lastName: user.last_name || user.lastName,
+        email: user.email,
+        role: user.role
+      });
+    }
+  }, [user]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +89,9 @@ const Navbar = () => {
       .join("")
       .toUpperCase();
   };
+
+  // Determine if user is authenticated by checking both context and local state
+  const userAuthenticated = isAuthenticated || !!currentUser;
 
   return (
     <nav
@@ -111,7 +157,7 @@ const Navbar = () => {
 
             {/* Desktop menu */}
             <div className="hidden md:flex items-center space-x-3">
-              {isAuthenticated ? (
+              {userAuthenticated ? (
                 <motion.div
                   className="flex items-center space-x-3"
                   initial={{ opacity: 0 }}
@@ -133,25 +179,25 @@ const Navbar = () => {
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
-                        className="rounded-full p-0 h-9 hover:bg-gray-50"
+                        className="rounded-full p-3 h-9 hover:bg-gray-50"
                       >
                         <div className="flex items-center space-x-2">
                           <Avatar className="h-8 w-8 border border-gray-200">
-                            <AvatarImage src={user?.avatar} />
+                            {/* <AvatarImage src={currentUser?.avatar} /> */}
                             <AvatarFallback className="bg-gradient-to-br from-red-500 to-red-600 text-white text-sm">
-                              {user?.name ? getInitials(user.name) : "U"}
+                              {currentUser ? getInitials(currentUser?.firstName + " " + currentUser?.lastName) : "U"}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex flex-col items-start">
                             <span className="text-sm font-medium text-gray-800 line-clamp-1">
-                              {user?.name || "User"}
+                              {currentUser?.firstName + " " + currentUser?.lastName || "User"}
                             </span>
                             <span className="text-xs text-gray-500">
-                              {user?.role === "admin"
+                              {currentUser?.role === "admin"
                                 ? "Admin"
-                                : user?.role === "event_organizer"
+                                : currentUser?.role === "event_organizer"
                                   ? "Organizer"
-                                  : user?.role === "stall_manager"
+                                  : currentUser?.role === "stall_manager"
                                     ? "Manager"
                                     : "User"}
                             </span>
@@ -168,11 +214,11 @@ const Navbar = () => {
                       </DropdownMenuLabel>
                       <Link
                         to={
-                          user?.role === "admin"
+                          currentUser?.role === "admin"
                             ? "/admin"
-                            : user?.role === "event_organizer"
+                            : currentUser?.role === "event_organizer"
                               ? "/organizer"
-                              : user?.role === "stall_manager"
+                              : currentUser?.role === "stall_manager"
                                 ? "/stall-manager"
                                 : "/dashboard"
                         }
@@ -275,59 +321,51 @@ const Navbar = () => {
                 </Link>
               </div>
 
-              {isAuthenticated ? (
+              {userAuthenticated ? (
                 <div className="space-y-3 pt-2 border-t border-gray-100">
                   <div className="flex items-center space-x-3 px-2 py-3">
                     <Avatar className="h-10 w-10 border border-gray-200">
-                      <AvatarImage src={user?.avatar} />
+                      <AvatarImage src={currentUser?.avatar || ""} />
                       <AvatarFallback className="bg-gradient-to-br from-red-500 to-red-600 text-white">
-                        {user?.name ? getInitials(user.name) : "U"}
+                        {currentUser?.firstName ? getInitials(currentUser?.firstName + " " + currentUser?.lastName) : "U"}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
                       <span className="font-medium text-gray-800">
-                        {user?.name || "User"}
+                        {currentUser?.firstName + " " + currentUser?.lastName || "User"}
                       </span>
                       <span className="text-xs text-gray-500">
-                        {user?.role === "admin"
-                          ? "Admin"
-                          : user?.role === "event_organizer"
+                        {currentUser?.role === "stall_manager"
+                          ? "Stall Manager"
+                          : currentUser?.role === "event_organizer"
                             ? "Organizer"
                             : "User"}
                       </span>
                     </div>
                   </div>
-
                   <Link
                     to={
-                      user?.role === "admin"
+                      currentUser?.role === "admin"
                         ? "/admin"
-                        : user?.role === "event_organizer"
+                        : currentUser?.role === "event_organizer"
                           ? "/organizer"
-                          : "/dashboard"
+                          : currentUser?.role === "stall_manager"
+                            ? "/stall-manager"
+                            : "/dashboard"
                     }
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <Button
                       variant="ghost"
-                      className="w-full justify-start rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-50"
+                      className="w-full justify-start rounded-lg px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                     >
-                      <User className="h-4 w-4 mr-2 text-gray-500" />
+                      <User className="h-4 w-4 mr-2" />
                       <span>Dashboard</span>
-                    </Button>
-                  </Link>
-                  <Link to="/profile" onClick={() => setMobileMenuOpen(false)}>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-50"
-                    >
-                      <User className="h-4 w-4 mr-2 text-gray-500" />
-                      <span>Profile</span>
                     </Button>
                   </Link>
                   <Button
                     variant="ghost"
-                    className="w-full justify-start rounded-lg px-3 py-2 text-red-600 hover:bg-red-50"
+                    className="w-full justify-start rounded-lg px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50"
                     onClick={() => {
                       logout();
                       setMobileMenuOpen(false);
@@ -342,17 +380,13 @@ const Navbar = () => {
                   <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
                     <Button
                       variant="ghost"
-                      className="w-full justify-start rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-50"
+                      className="w-full justify-start rounded-lg px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                     >
-                      <User className="h-4 w-4 mr-2 text-gray-500" />
                       <span>Login</span>
                     </Button>
                   </Link>
                   <Link to="/signup" onClick={() => setMobileMenuOpen(false)}>
-                    <Button
-                      className="w-full justify-start rounded-lg px-3 py-2 bg-gradient-to-r from-red-600 to-red-500 text-white hover:from-red-700 hover:to-red-600"
-                    >
-                      <User className="h-4 w-4 mr-2" />
+                    <Button className="w-full justify-start rounded-lg px-3 py-2 bg-gradient-to-r from-red-600 to-red-500 text-white hover:from-red-700 hover:to-red-600">
                       <span>Sign Up</span>
                     </Button>
                   </Link>
