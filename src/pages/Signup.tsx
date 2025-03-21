@@ -58,7 +58,7 @@ const Signup = () => {
   return (
     <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4">
       <div className="absolute inset-0 bg-[url('/background-pattern.svg')] opacity-5 z-0"></div>
-      
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -185,7 +185,7 @@ const Signup = () => {
                 <SelectTrigger>
                   <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white border border-gray-200 shadow-md">
                   {roles.map(role => (
                     <SelectItem key={role.id} value={role.id}>
                       {role.label}
@@ -195,8 +195,8 @@ const Signup = () => {
               </Select>
             </div>
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-2 rounded-lg shadow-md transition-all duration-300"
               disabled={isSubmitting}
             >

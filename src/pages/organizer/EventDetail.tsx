@@ -26,7 +26,8 @@ import {
   Edit,
   BookOpen,
   Trash2,
-  Download
+  Download,
+  Tickets
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { EventService } from "@/lib/api";
@@ -81,6 +82,7 @@ interface EventDetail {
   zip_code: string;
   banner_image: string;
   max_capacity: number;
+  current_capacity: number;
   price: string;
   is_published: boolean;
   verification_status: string;
@@ -92,8 +94,12 @@ interface EventDetail {
     id: string;
     image_url: string;
   }>;
-  booking_count?: number;
-  total_revenue?: string;
+  stats?: {
+    totalBookings: number;
+    totalTicketSold: number;
+    totalRevenue: number;
+    uniqueAttendees: number;
+  }
   stalls?: Array<{
     id: string;
     name: string;
@@ -564,7 +570,17 @@ const EventDetail = () => {
                   </div>
                   <div>
                     <div className="text-sm text-gray-500">Total Bookings</div>
-                    <div className="text-xl font-bold text-gray-800">{eventDetail.booking_count || 0}</div>
+                    <div className="text-xl font-bold text-gray-800">{eventDetail.stats.totalBookings || 0}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center">
+                  <div className="bg-primary/10 p-3 rounded-full mr-4">
+                    <Tickets className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Total Tickets Sold</div>
+                    <div className="text-xl font-bold text-gray-800">{eventDetail.stats.totalTicketSold || 0}</div>
                   </div>
                 </div>
 
@@ -574,7 +590,7 @@ const EventDetail = () => {
                   </div>
                   <div>
                     <div className="text-sm text-gray-500">Total Revenue</div>
-                    <div className="text-xl font-bold text-gray-800">${eventDetail.total_revenue || "0.00"}</div>
+                    <div className="text-xl font-bold text-gray-800">${eventDetail.stats.totalRevenue || "0.00"}</div>
                   </div>
                 </div>
 
@@ -585,8 +601,8 @@ const EventDetail = () => {
                   <div>
                     <div className="text-sm text-gray-500">Capacity Filled</div>
                     <div className="text-xl font-bold text-gray-800">
-                      {eventDetail.booking_count && eventDetail.max_capacity
-                        ? `${Math.round((eventDetail.booking_count / eventDetail.max_capacity) * 100)}%`
+                      {eventDetail.current_capacity && eventDetail.max_capacity
+                        ? `${Math.round((eventDetail.current_capacity / eventDetail.max_capacity) * 100)}%`
                         : "0%"}
                     </div>
                   </div>

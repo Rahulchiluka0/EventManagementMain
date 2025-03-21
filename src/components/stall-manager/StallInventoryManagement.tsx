@@ -413,7 +413,7 @@ const StallInventoryManagement = () => {
                   <SelectTrigger className="border-gray-200 focus:border-red-500 focus:ring-red-500">
                     <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border border-gray-200 shadow-md">
                     {categories.map((category) => (
                       <SelectItem key={category.id} value={category.id.toString()}>
                         {category.name}

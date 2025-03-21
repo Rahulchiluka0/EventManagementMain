@@ -214,7 +214,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // Get single event by ID (for organizer)
-router.get('/organiser/myevents/:id', async (req, res, next) => {
+router.get('/organiser/myevents/:id', authenticate, authorize('event_organizer', 'admin'), async (req, res, next) => {
   try {
     const eventId = req.params.id;
 
@@ -223,35 +223,56 @@ router.get('/organiser/myevents/:id', async (req, res, next) => {
       `SELECT e.*, u.first_name || ' ' || u.last_name as organizer_name
        FROM events e
        JOIN users u ON e.organizer_id = u.id
-       WHERE e.id = $1 `,
-      [eventId]
+       WHERE e.id = $1 AND (e.organizer_id = $2 OR $3 = true)`,
+      [eventId, req.user.id, req.user.role === 'admin']
     );
 
     if (eventResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Event not found' });
+      return res.status(404).json({ message: 'Event not found or you do not have permission to view it' });
     }
 
     const event = eventResult.rows[0];
 
     // Get event images
     const imagesResult = await db.query(
-      'SELECT id, image_url FROM event_images WHERE event_id = $1',
+      'SELECT * FROM event_images WHERE event_id = $1',
       [eventId]
     );
 
-    // Get stalls associated with this event
+    // Get event statistics
+    const statsResult = await db.query(
+      `SELECT 
+         COUNT(b.id) as total_bookings,
+         COALESCE(SUM(b.quantity), 0) as total_tickets_sold,
+         COALESCE(SUM(b.total_price), 0) as total_revenue,
+         COUNT(DISTINCT b.user_id) as unique_attendees
+       FROM bookings b
+       WHERE b.event_id = $1 AND b.status = 'confirmed'`,
+      [eventId]
+    );
+
+    // Get stalls for this event if any
     const stallsResult = await db.query(
-      'SELECT * FROM stalls WHERE event_id = $1',
+      `SELECT * FROM stalls 
+       WHERE event_id = $1
+       ORDER BY created_at ASC`,
       [eventId]
     );
 
-    const eventWithImages = {
+    // Format the response
+    const eventWithDetails = {
       ...event,
       images: imagesResult.rows,
-      stalls: stallsResult.rows
+      stalls: stallsResult.rows,
+      stats: {
+        totalBookings: parseInt(statsResult.rows[0].total_bookings),
+        totalTicketSold: parseInt(statsResult.rows[0].total_tickets_sold),
+        totalRevenue: parseFloat(statsResult.rows[0].total_revenue),
+        uniqueAttendees: parseInt(statsResult.rows[0].unique_attendees)
+      }
     };
 
-    res.json({ event: eventWithImages });
+    res.json({ event: eventWithDetails });
   } catch (error) {
     next(error);
   }
