@@ -676,28 +676,68 @@ router.get('/:id', authenticate, authorize('stall_manager', 'event_organizer', '
   try {
     const stallId = req.params.id;
 
-    // Get stall details with event and organizer information
-    const stallResult = await db.query(
-      `SELECT s.*, 
-              se.title as event_title, 
-              se.description as event_description,
-              se.start_date, 
-              se.end_date, 
-              se.location,
-              se.address,
-              se.city,
-              se.state,
-              se.country,
-              se.zip_code,
-              u.first_name || ' ' || u.last_name as organizer_name,
-              u.email as organizer_email,
-              u.phone as organizer_phone
-       FROM stalls s
-       JOIN stall_events se ON s.stall_event_id = se.id
-       JOIN users u ON se.organizer_id = u.id
-       WHERE s.id = $1`,
+    // First, check if this is a stall associated with a stall event or a regular event
+    const stallTypeCheck = await db.query(
+      `SELECT stall_event_id, event_id FROM stalls WHERE id = $1`,
       [stallId]
     );
+
+    if (stallTypeCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Stall not found' });
+    }
+
+    const { stall_event_id, event_id } = stallTypeCheck.rows[0];
+    let stallResult;
+
+    if (stall_event_id) {
+      // This is a stall for a stall event
+      stallResult = await db.query(
+        `SELECT s.*, 
+                se.title as event_title, 
+                se.description as event_description,
+                se.start_date, 
+                se.end_date, 
+                se.location,
+                se.address,
+                se.city,
+                se.state,
+                se.country,
+                se.zip_code,
+                u.first_name || ' ' || u.last_name as organizer_name,
+                u.email as organizer_email,
+                u.phone as organizer_phone
+         FROM stalls s
+         JOIN stall_events se ON s.stall_event_id = se.id
+         JOIN users u ON se.organizer_id = u.id
+         WHERE s.id = $1`,
+        [stallId]
+      );
+    } else if (event_id) {
+      // This is a stall for a regular event
+      stallResult = await db.query(
+        `SELECT s.*, 
+                e.title as event_title, 
+                e.description as event_description,
+                e.start_date, 
+                e.end_date, 
+                e.location,
+                e.address,
+                e.city,
+                e.state,
+                e.country,
+                e.zip_code,
+                u.first_name || ' ' || u.last_name as organizer_name,
+                u.email as organizer_email,
+                u.phone as organizer_phone
+         FROM stalls s
+         JOIN events e ON s.event_id = e.id
+         JOIN users u ON e.organizer_id = u.id
+         WHERE s.id = $1`,
+        [stallId]
+      );
+    } else {
+      return res.status(404).json({ message: 'Stall not associated with any event' });
+    }
 
     if (stallResult.rows.length === 0) {
       return res.status(404).json({ message: 'Stall not found' });
@@ -712,12 +752,21 @@ router.get('/:id', authenticate, authorize('stall_manager', 'event_organizer', '
 
     if (req.user.role === 'event_organizer') {
       // Get the organizer ID for this stall's event
-      const organizerCheck = await db.query(
-        'SELECT organizer_id FROM stall_events WHERE id = $1',
-        [stall.stall_event_id]
-      );
+      let organizerCheck;
 
-      if (organizerCheck.rows[0].organizer_id !== req.user.id) {
+      if (stall_event_id) {
+        organizerCheck = await db.query(
+          'SELECT organizer_id FROM stall_events WHERE id = $1',
+          [stall.stall_event_id]
+        );
+      } else if (event_id) {
+        organizerCheck = await db.query(
+          'SELECT organizer_id FROM events WHERE id = $1',
+          [stall.event_id]
+        );
+      }
+
+      if (organizerCheck && organizerCheck.rows[0].organizer_id !== req.user.id) {
         return res.status(403).json({ message: 'You are not authorized to view this stall' });
       }
     }
@@ -731,7 +780,6 @@ router.get('/:id', authenticate, authorize('stall_manager', 'event_organizer', '
        WHERE b.stall_id = $1 AND b.status = 'confirmed'`,
       [stallId]
     );
-
 
     const stats = statsResult.rows[0];
 
