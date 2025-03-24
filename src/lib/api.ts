@@ -4,7 +4,7 @@ import axios from 'axios';
 // Create axios instance with base URL and credentials
 const api = axios.create({
   baseURL: import.meta.env.MODE === 'production' 
-    ? '/api' 
+    ? 'https://deveventmanagementapi.56-north.com' 
     : 'http://localhost:3000/api',
   withCredentials: true,
   headers: {

@@ -9,7 +9,7 @@
     "dev": "nodemon index.js",
     "init-db": "node db/init.js",
     "migrate-db": "node db/migrate-roles.js",
-    "build": "esbuild index.js --bundle --platform=node --outfile=dist/server.js --external:pg --external:express --external:multer --external:bcrypt"
+    "build": "esbuild index.js --bundle --platform=node --format=esm --outfile=dist/server.js --external:aws-sdk --external:mock-aws-s3 --external:nock --loader:.html=text"
   },
   "keywords": [
     "event",
